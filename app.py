@@ -163,6 +163,33 @@ def init_db():
         cursor.execute('''
             INSERT OR IGNORE INTO ShopSettings (id) VALUES (1)
         ''')
+        # DMMemo table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS DMMemo (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                dm_number TEXT NOT NULL UNIQUE,
+                dm_date TEXT NOT NULL,
+                party_name TEXT NOT NULL,
+                party_mobile TEXT,
+                party_address TEXT,
+                transport TEXT,
+                ref_invoice TEXT,
+                remarks TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS DMMemoItem (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                dm_id INTEGER NOT NULL,
+                item_name TEXT NOT NULL,
+                company TEXT,
+                batch TEXT,
+                quantity INTEGER NOT NULL,
+                unit TEXT DEFAULT 'Nos',
+                FOREIGN KEY (dm_id) REFERENCES DMMemo(id) ON DELETE CASCADE
+            )
+        ''')
         # CashReceipt table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS CashReceipt (
@@ -201,6 +228,10 @@ def init_db():
         except Exception:
             pass
         try:
+            cursor.execute("ALTER TABLE InvoiceItem ADD COLUMN cost_price REAL DEFAULT 0")
+        except Exception:
+            pass
+        try:
             cursor.execute("ALTER TABLE Product ADD COLUMN company TEXT")
         except Exception:
             pass
@@ -226,6 +257,10 @@ def init_db():
             pass
         try:
             cursor.execute("ALTER TABLE Invoice ADD COLUMN grand_total REAL DEFAULT 0")
+        except Exception:
+            pass
+        try:
+            cursor.execute("ALTER TABLE Invoice ADD COLUMN net_profit REAL DEFAULT 0")
         except Exception:
             pass
         # One-time cleanup: unlink contra entries wrongly linked to party_id
@@ -841,7 +876,6 @@ def delete_transaction(transaction_id):
 
 @app.route('/reports')
 def reports():
-    """loads the reports page with inventory summaries and charts"""
     db=get_db()
 
     total_value_row=db.execute('SELECT SUM(stock_quantity * unit_price) FROM Product').fetchone()
@@ -854,76 +888,40 @@ def reports():
         WHERE p.stock_quantity < 10
         ORDER BY p.stock_quantity ASC
     ''').fetchall()
-    low_stock_count =len(low_stock_products_raw)
+    low_stock_count=len(low_stock_products_raw)
+    supplier_count=db.execute('SELECT COUNT(*) FROM Supplier').fetchone()[0]
 
-    supplier_count= db.execute('SELECT COUNT(*) FROM Supplier').fetchone()[0]
-
-
-
-    # sales over time (Units Sold)
-    sales_data_raw=db.execute('''
-        SELECT
-            strftime('%Y-%m', date) as month,
-            SUM(quantity) as total_sold
-        FROM "Transaction"
-        WHERE type = 'sale'
-        GROUP BY month
-        ORDER BY month DESC
-        LIMIT 6
+    # Revenue and profit grouped by month from invoices
+    sales_data_raw = db.execute('''
+        SELECT strftime('%Y-%m', invoice_date) as month,
+               SUM(grand_total) as total_sales,
+               SUM(net_profit) as total_profit
+        FROM Invoice
+        GROUP BY month ORDER BY month DESC LIMIT 6
     ''').fetchall()
-    sales_months= [row['month'] for row in reversed(sales_data_raw)]
-    sales_values=[row['total_sold'] for row in reversed(sales_data_raw)]
+    sales_months = [row['month'] for row in reversed(sales_data_raw)]
+    sales_values = [round(row['total_sales'] or 0, 2) for row in reversed(sales_data_raw)]
 
-    # net sales value over time
-    net_sales_value_raw = db.execute('''
-        SELECT
-            strftime('%Y-%m', date) as month,
-            SUM(quantity * unit_price) as total_sales_value
-        FROM "Transaction"
-        WHERE type = 'sale'
-        GROUP BY month
-        ORDER BY month DESC
-        LIMIT 6
-    ''').fetchall()
-    net_sales_months = [row['month'] for row in reversed(net_sales_value_raw)]
-    net_sales_values = [round(row['total_sales_value'], 2) for row in reversed(net_sales_value_raw)]
+    net_profit_months = sales_months
+    net_profit_values = [round(row['total_profit'] or 0, 2) for row in reversed(sales_data_raw)]
 
+    net_sales_months = sales_months
+    net_sales_values = sales_values
 
-    # net profit over time
-    net_profit_raw= db.execute('''
-        SELECT
-            strftime('%Y-%m', date) as month,
-            SUM(CASE WHEN type = 'sale' THEN quantity * unit_price ELSE 0 END) -
-            SUM(CASE WHEN type = 'purchase' THEN quantity * unit_price ELSE 0 END) AS net_profit
-        FROM "Transaction"
-        GROUP BY month
-        ORDER BY month DESC
-        LIMIT 6
-    ''').fetchall()
-    net_profit_months=[row['month'] for row in reversed(net_profit_raw)]
-    net_profit_values= [round(row['net_profit'], 2) for row in reversed(net_profit_raw)]
-
+    total_net_profit = round(db.execute('SELECT COALESCE(SUM(net_profit),0) FROM Invoice').fetchone()[0], 2)
 
     top_products_raw=db.execute('''
-        SELECT
-            p.name,
-            SUM(t.quantity) AS total_sold_quantity
-        FROM "Transaction" t
-        JOIN Product p ON t.product_id = p.id
+        SELECT p.name, SUM(t.quantity) AS total_sold_quantity
+        FROM "Transaction" t JOIN Product p ON t.product_id = p.id
         WHERE t.type = 'sale'
-        GROUP BY p.name
-        ORDER BY total_sold_quantity DESC
-        LIMIT 5
+        GROUP BY p.name ORDER BY total_sold_quantity DESC LIMIT 5
     ''').fetchall()
-
     top_products_names=[row['name'] for row in top_products_raw]
     top_products_counts=[row['total_sold_quantity'] for row in top_products_raw]
 
-
-    purchase_count=db.execute("SELECT COUNT(*) FROM \"Transaction\" WHERE type = 'purchase'").fetchone()[0]
-    sale_count=db.execute("SELECT COUNT(*) FROM \"Transaction\" WHERE type = 'sale'").fetchone()[0]
-    type_counts= [purchase_count, sale_count]
-
+    purchase_count=db.execute("SELECT COUNT(*) FROM \"Transaction\" WHERE type='purchase'").fetchone()[0]
+    sale_count=db.execute("SELECT COUNT(*) FROM \"Transaction\" WHERE type='sale'").fetchone()[0]
+    type_counts=[purchase_count, sale_count]
 
     return render_template('reports.html',
                            total_value=total_value,
@@ -932,10 +930,11 @@ def reports():
                            low_stock_products=low_stock_products_raw,
                            sales_months=sales_months,
                            sales_values=sales_values,
-                           net_sales_months=net_sales_months, # New data
-                           net_sales_values=net_sales_values, # New data
-                           net_profit_months=net_profit_months, # New data
-                           net_profit_values=net_profit_values, # New data
+                           net_sales_months=net_sales_months,
+                           net_sales_values=net_sales_values,
+                           net_profit_months=net_profit_months,
+                           net_profit_values=net_profit_values,
+                           total_net_profit=total_net_profit,
                            top_products_names=top_products_names,
                            top_products_counts=top_products_counts,
                            type_counts=type_counts)
@@ -1100,8 +1099,19 @@ def create_invoice():
         total_taxable += taxable
         total_cgst    += cgst_amt
         total_sgst    += sgst_amt
+        # Lookup last purchase price for this product as cost price
+        cost_price = 0.0
+        pid = int(product_ids[i]) if product_ids[i] else None
+        if pid:
+            cp_row = db.execute('''
+                SELECT unit_price FROM "Transaction"
+                WHERE product_id=? AND type='purchase'
+                ORDER BY id DESC LIMIT 1
+            ''', (pid,)).fetchone()
+            if cp_row:
+                cost_price = cp_row['unit_price']
         items_data.append({
-            'product_id':   int(product_ids[i]) if product_ids[i] else None,
+            'product_id':   pid,
             'description':  desc.strip(),
             'batch':        batches[i]       if i < len(batches)       else '',
             'mfg_date':     mfg_dates[i]     if i < len(mfg_dates)     else '',
@@ -1114,10 +1124,13 @@ def create_invoice():
             'incl_amount':  incl_amt,
             'cgst':         cgst_amt,
             'sgst':         sgst_amt,
+            'cost_price':   cost_price,
         })
 
     round_off   = float(f.get('round_off') or 0)
     grand_total = round(total_taxable + total_cgst + total_sgst + round_off, 2)
+    total_cost  = round(sum(it['cost_price'] * it['quantity'] for it in items_data), 2)
+    net_profit  = round(grand_total - total_cost, 2)
     bill_type   = f.get('bill_type', 'cash')
     shop        = get_settings()
 
@@ -1129,8 +1142,8 @@ def create_invoice():
                 bill_to_name, bill_to_gstin,
                 ship_to_mobile, terms,
                 cgst_rate, sgst_rate, cgst2_rate, sgst2_rate, round_off, status,
-                bill_type, total_taxable, total_cgst, total_sgst, grand_total
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                bill_type, total_taxable, total_cgst, total_sgst, grand_total, net_profit
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ''', (
             inv_num, f['invoice_date'], f.get('due_date', f['invoice_date']),
             f.get('bill_to_name',''), f.get('bill_to_gstin',''),
@@ -1138,7 +1151,7 @@ def create_invoice():
             shop['default_cgst'], shop['default_sgst'], 0, 0,
             round_off, 'paid',
             bill_type,
-            round(total_taxable,2), round(total_cgst,2), round(total_sgst,2), grand_total
+            round(total_taxable,2), round(total_cgst,2), round(total_sgst,2), grand_total, net_profit
         ))
         invoice_id = cursor.lastrowid
 
@@ -1146,13 +1159,23 @@ def create_invoice():
             cursor.execute('''
                 INSERT INTO InvoiceItem
                     (invoice_id, product_id, item_description, batch, mfg_date, exp_date,
-                     manufacturer, quantity, rate, tax_label, tax_rate)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                     manufacturer, quantity, rate, tax_label, tax_rate, cost_price)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
             ''', (
                 invoice_id, item['product_id'], item['description'],
                 item['batch'], item['mfg_date'], item['exp_date'], item['manufacturer'],
-                item['quantity'], item['rate'], item['tax_label'], item['tax_rate']
+                item['quantity'], item['rate'], item['tax_label'], item['tax_rate'], item['cost_price']
             ))
+            # Deduct stock and record sale transaction
+            if item['product_id']:
+                cursor.execute('''
+                    UPDATE Product SET stock_quantity = stock_quantity - ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''', (item['quantity'], item['product_id']))
+                cursor.execute('''
+                    INSERT INTO "Transaction" (product_id, quantity, type, date, unit_price)
+                    VALUES (?, ?, 'sale', ?, ?)
+                ''', (item['product_id'], item['quantity'], f['invoice_date'], item['rate']))
 
         # --- Auto ledger posting ---
         last_group = db.execute('SELECT MAX(group_id) FROM LedgerEntry').fetchone()[0]
@@ -1652,6 +1675,86 @@ def post_supplier_payment():
         db.rollback()
         flash(f'Error recording payment: {e}', 'danger')
     return redirect(url_for('supplier_payment'))
+
+
+# --- All Invoices & DM Memo Routes ---
+
+@app.route('/all_invoices')
+def all_invoices():
+    db = get_db()
+    invoices = db.execute('SELECT * FROM Invoice ORDER BY invoice_date DESC, id DESC').fetchall()
+    total_revenue = db.execute('SELECT COALESCE(SUM(grand_total),0) FROM Invoice').fetchone()[0]
+    return render_template('all_invoices.html', invoices=invoices, total_revenue=round(total_revenue,2))
+
+
+@app.route('/dm_memo')
+def dm_memo():
+    db = get_db()
+    memos = db.execute('SELECT * FROM DMMemo ORDER BY created_at DESC').fetchall()
+    products = db.execute('SELECT p.*, s.name AS supplier_name FROM Product p LEFT JOIN Supplier s ON p.supplier_id=s.id ORDER BY p.name').fetchall()
+    now = datetime.now().strftime('%Y-%m-%d')
+    return render_template('dm_memo.html', memos=memos, products=products, now=now)
+
+
+@app.route('/create_dm_memo', methods=['POST'])
+def create_dm_memo():
+    db = get_db()
+    f = request.form
+    dm_num = f.get('dm_number','').strip()
+    if not dm_num:
+        last = db.execute('SELECT dm_number FROM DMMemo ORDER BY id DESC LIMIT 1').fetchone()
+        try:
+            num = int((last['dm_number'] if last else 'DM0').replace('DM','')) + 1
+        except Exception:
+            num = 1
+        dm_num = f'DM{num:04d}'
+    try:
+        cursor = db.cursor()
+        cursor.execute('''
+            INSERT INTO DMMemo (dm_number,dm_date,party_name,party_mobile,party_address,transport,ref_invoice,remarks)
+            VALUES (?,?,?,?,?,?,?,?)
+        ''', (dm_num, f['dm_date'], f['party_name'], f.get('party_mobile',''),
+              f.get('party_address',''), f.get('transport',''), f.get('ref_invoice',''), f.get('remarks','')))
+        dm_id = cursor.lastrowid
+        names = f.getlist('item_name[]')
+        for i, name in enumerate(names):
+            if not name.strip(): continue
+            cursor.execute('''
+                INSERT INTO DMMemoItem (dm_id,item_name,company,batch,quantity,unit)
+                VALUES (?,?,?,?,?,?)
+            ''', (dm_id, name.strip(),
+                  f.getlist('company[]')[i] if i < len(f.getlist('company[]')) else '',
+                  f.getlist('batch[]')[i]   if i < len(f.getlist('batch[]'))   else '',
+                  int(f.getlist('quantity[]')[i]) if i < len(f.getlist('quantity[]')) else 1,
+                  f.getlist('unit[]')[i]    if i < len(f.getlist('unit[]'))    else 'Nos'))
+        db.commit()
+        flash(f'DM Memo {dm_num} created!', 'success')
+        return redirect(url_for('print_dm_memo', dm_id=dm_id))
+    except Exception as e:
+        db.rollback()
+        flash(f'Error creating DM Memo: {e}', 'danger')
+        return redirect(url_for('dm_memo'))
+
+
+@app.route('/dm_memo/print/<int:dm_id>')
+def print_dm_memo(dm_id):
+    db = get_db()
+    memo = db.execute('SELECT * FROM DMMemo WHERE id=?', (dm_id,)).fetchone()
+    if not memo:
+        flash('DM Memo not found.', 'danger')
+        return redirect(url_for('dm_memo'))
+    items = db.execute('SELECT * FROM DMMemoItem WHERE dm_id=? ORDER BY id', (dm_id,)).fetchall()
+    shop = get_settings()
+    return render_template('dm_memo_print.html', memo=dict(memo), items=items, shop=shop)
+
+
+@app.route('/delete_dm_memo/<int:dm_id>', methods=['POST'])
+def delete_dm_memo(dm_id):
+    db = get_db()
+    db.execute('DELETE FROM DMMemo WHERE id=?', (dm_id,))
+    db.commit()
+    flash('DM Memo deleted.', 'success')
+    return redirect(url_for('dm_memo'))
 
 
 if __name__=='__main__':

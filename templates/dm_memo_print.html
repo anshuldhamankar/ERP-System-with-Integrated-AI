@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>DM Memo — {{ memo.dm_number }}</title>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 12px; padding: 20px; background:#fff; }
+    .page { max-width: 720px; margin: auto; border: 2px solid #333; padding: 20px; }
+    .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 15px; }
+    .header h2 { margin: 0; font-size: 20px; }
+    .header p { margin: 2px 0; font-size: 11px; color: #555; }
+    .title-bar { background: #1565C0; color: #fff; text-align: center; padding: 6px; font-size: 15px; font-weight: bold; margin-bottom: 12px; }
+    .meta { display: flex; justify-content: space-between; margin-bottom: 12px; }
+    .meta-box { font-size: 12px; }
+    .meta-box p { margin: 3px 0; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+    th { background: #1565C0; color: #fff; padding: 6px; text-align: center; font-size: 11px; }
+    td { border: 1px solid #ccc; padding: 5px 8px; }
+    .text-center { text-align: center; }
+    .footer { display: flex; justify-content: space-between; margin-top: 30px; font-size: 11px; }
+    .sig { text-align: center; }
+    .note { text-align: center; font-size: 10px; color: #888; margin-top: 15px; border-top: 1px solid #ccc; padding-top: 8px; }
+    @media print { .no-print { display: none; } body { padding: 0; } }
+  </style>
+</head>
+<body>
+  <div class="no-print" style="margin-bottom:15px;">
+    <button onclick="window.print()" style="padding:7px 18px;cursor:pointer;">🖨️ Print</button>
+    <button onclick="window.close()" style="padding:7px 18px;margin-left:8px;">✕ Close</button>
+  </div>
+
+  <div class="page">
+    <div class="header">
+      <h2>{{ shop.shop_name }}</h2>
+      {% if shop.address %}<p>{{ shop.address }}</p>{% endif %}
+      {% if shop.phone %}<p>📞 {{ shop.phone }}</p>{% endif %}
+      {% if shop.gstin %}<p>GSTIN: {{ shop.gstin }}</p>{% endif %}
+    </div>
+
+    <div class="title-bar">DELIVERY / DISPATCH MEMO</div>
+
+    <div class="meta">
+      <div class="meta-box">
+        <p><strong>To:</strong> {{ memo.party_name }}</p>
+        {% if memo.party_mobile %}<p><strong>Mobile:</strong> {{ memo.party_mobile }}</p>{% endif %}
+        {% if memo.party_address %}<p><strong>Address:</strong> {{ memo.party_address }}</p>{% endif %}
+      </div>
+      <div class="meta-box" style="text-align:right;">
+        <p><strong>DM No.:</strong> {{ memo.dm_number }}</p>
+        <p><strong>Date:</strong> {{ memo.dm_date }}</p>
+        {% if memo.transport %}<p><strong>Transport:</strong> {{ memo.transport }}</p>{% endif %}
+        {% if memo.ref_invoice %}<p><strong>Ref Invoice:</strong> {{ memo.ref_invoice }}</p>{% endif %}
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width:35px">#</th>
+          <th>Item Name</th>
+          <th>Company / Brand</th>
+          <th>Batch No.</th>
+          <th style="width:60px">Qty</th>
+          <th style="width:60px">Unit</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td class="text-center">{{ loop.index }}</td>
+          <td><strong>{{ item.item_name }}</strong></td>
+          <td>{{ item.company or '—' }}</td>
+          <td>{{ item.batch or '—' }}</td>
+          <td class="text-center">{{ item.quantity }}</td>
+          <td class="text-center">{{ item.unit or 'Nos' }}</td>
+        </tr>
+        {% endfor %}
+        {% for _ in range([0, 5 - items|length]|max) %}
+        <tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if memo.remarks %}
+    <p><strong>Remarks:</strong> {{ memo.remarks }}</p>
+    {% endif %}
+
+    <div class="footer">
+      <div class="sig">
+        <br/><br/>
+        <p>Receiver's Signature</p>
+      </div>
+      <div class="sig">
+        <br/><br/>
+        <p>For {{ shop.shop_name }}</p>
+        <p>Authorized Signatory</p>
+      </div>
+    </div>
+
+    <div class="note">This is a computer generated document</div>
+  </div>
+
+  <script>window.onload = function(){ window.print(); }</script>
+</body>
+</html>

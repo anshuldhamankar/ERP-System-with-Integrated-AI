@@ -11,17 +11,7 @@
     </div>
   </div>
 
-  {% set sub_total = namespace(val=0) %}
-  {% for item in items %}
-    {% set base = item.quantity * item.rate %}
-    {% set amt  = base + (base * item.tax_rate / 100) %}
-    {% set sub_total.val = sub_total.val + amt %}
-  {% endfor %}
-  {% set cgst_amt  = sub_total.val * invoice.cgst_rate  / 100 %}
-  {% set sgst_amt  = sub_total.val * invoice.sgst_rate  / 100 %}
-  {% set cgst2_amt = sub_total.val * invoice.cgst2_rate / 100 %}
-  {% set sgst2_amt = sub_total.val * invoice.sgst2_rate / 100 %}
-  {% set grand_total = sub_total.val + cgst_amt + sgst_amt + cgst2_amt + sgst2_amt + invoice.round_off %}
+  {% set grand_total = invoice.grand_total %}
 
   <div class="card shadow-sm">
     <div class="card-body p-4">
@@ -29,7 +19,10 @@
       <!-- Header -->
       <div class="row mb-3">
         <div class="col-md-6">
-          <h4 class="fw-bold">{{ invoice.supplier_name or 'Your Company' }}</h4>
+          <h4 class="fw-bold">{{ shop.shop_name }}</h4>
+          {% if shop.address %}<p class="small text-muted mb-0">{{ shop.address }}</p>{% endif %}
+          {% if shop.phone %}<p class="small text-muted mb-0">📞 {{ shop.phone }}</p>{% endif %}
+          {% if shop.gstin %}<p class="small text-muted mb-0">GSTIN: {{ shop.gstin }}</p>{% endif %}
         </div>
         <div class="col-md-6 text-end">
           <div class="bg-primary text-white px-3 py-2 d-inline-block rounded">
@@ -76,8 +69,7 @@
         </thead>
         <tbody>
           {% for item in items %}
-          {% set base = item.quantity * item.rate %}
-          {% set amt  = base + (base * item.tax_rate / 100) %}
+          {% set incl_amt = item.quantity * item.rate %}
           <tr>
             <td class="text-center">{{ loop.index }}</td>
             <td>
@@ -94,14 +86,14 @@
             <td class="text-center">{{ item.quantity }}</td>
             <td class="text-end">{{ "%.2f"|format(item.rate) }}</td>
             <td class="text-center">{{ item.tax_label or '' }}{% if item.tax_rate %} ({{ item.tax_rate }}%){% endif %}</td>
-            <td class="text-end fw-bold">{{ "%.2f"|format(amt) }}</td>
+            <td class="text-end fw-bold">{{ "%.2f"|format(incl_amt) }}</td>
           </tr>
           {% endfor %}
         </tbody>
         <tfoot>
           <tr>
-            <td colspan="5" class="text-end fw-bold">Sub Total</td>
-            <td class="text-end fw-bold">{{ "%.2f"|format(sub_total.val) }}</td>
+            <td colspan="5" class="text-end fw-bold">Sub Total (Taxable)</td>
+            <td class="text-end fw-bold">{{ "%.2f"|format(invoice.total_taxable) }}</td>
           </tr>
         </tfoot>
       </table>
@@ -117,17 +109,11 @@
         </div>
         <div class="col-md-6">
           <table class="table table-sm table-borderless ms-auto" style="width:auto; min-width:280px;">
-            {% if invoice.cgst_rate %}
-            <tr><td>CGST {{ invoice.cgst_rate }}% on {{ "%.2f"|format(sub_total.val) }}</td><td class="text-end">{{ "%.2f"|format(cgst_amt) }}</td></tr>
+            {% if invoice.total_cgst %}
+            <tr><td>CGST</td><td class="text-end">{{ "%.2f"|format(invoice.total_cgst) }}</td></tr>
             {% endif %}
-            {% if invoice.sgst_rate %}
-            <tr><td>SGST {{ invoice.sgst_rate }}% on {{ "%.2f"|format(sub_total.val) }}</td><td class="text-end">{{ "%.2f"|format(sgst_amt) }}</td></tr>
-            {% endif %}
-            {% if invoice.cgst2_rate %}
-            <tr><td>CGST {{ invoice.cgst2_rate }}% on {{ "%.2f"|format(sub_total.val) }}</td><td class="text-end">{{ "%.2f"|format(cgst2_amt) }}</td></tr>
-            {% endif %}
-            {% if invoice.sgst2_rate %}
-            <tr><td>SGST {{ invoice.sgst2_rate }}% on {{ "%.2f"|format(sub_total.val) }}</td><td class="text-end">{{ "%.2f"|format(sgst2_amt) }}</td></tr>
+            {% if invoice.total_sgst %}
+            <tr><td>SGST</td><td class="text-end">{{ "%.2f"|format(invoice.total_sgst) }}</td></tr>
             {% endif %}
             {% if invoice.round_off %}
             <tr><td>Round Off</td><td class="text-end">{{ "%.2f"|format(invoice.round_off) }}</td></tr>
@@ -143,7 +129,7 @@
 
       <hr/>
       <div class="text-end">
-        <p class="small fw-bold">For {{ invoice.supplier_name or 'Your Company' }}</p>
+        <p class="small fw-bold">For {{ shop.shop_name }}</p>
         <p class="small text-muted mt-4">Authorized Signature</p>
       </div>
       <p class="text-center text-muted small mt-3">This is a computer generated document</p>

@@ -46,6 +46,8 @@
           <li class="nav-item"><a class="nav-link {% if request.path == url_for('stock') %}active{% endif %}" href="{{ url_for('stock') }}">Stock</a></li>
           <li class="nav-item"><a class="nav-link {% if request.path == url_for('reports') %}active{% endif %}" href="{{ url_for('reports') }}">Reports</a></li>
           <li class="nav-item"><a class="nav-link {% if '/billing' in request.path %}active{% endif %}" href="{{ url_for('billing') }}">Billing</a></li>
+          <li class="nav-item"><a class="nav-link {% if request.path == url_for('all_invoices') %}active{% endif %}" href="{{ url_for('all_invoices') }}">All Invoices</a></li>
+          <li class="nav-item"><a class="nav-link {% if '/dm_memo' in request.path %}active{% endif %}" href="{{ url_for('dm_memo') }}">DM Memo</a></li>
           <li class="nav-item"><a class="nav-link {% if '/cash_receipt' in request.path %}active{% endif %}" href="{{ url_for('cash_receipt') }}">Cash Receipt</a></li>
           <li class="nav-item"><a class="nav-link {% if '/supplier_payment' in request.path %}active{% endif %}" href="{{ url_for('supplier_payment') }}">Supplier Payment</a></li>
           <li class="nav-item"><a class="nav-link {% if request.path == url_for('ledger') %}active{% endif %}" href="{{ url_for('ledger') }}">Ledger</a></li>

@@ -56,17 +56,7 @@
 </head>
 <body>
 
-{% set sub_total = namespace(val=0) %}
-{% for item in items %}
-  {% set base = item.quantity * item.rate %}
-  {% set amt  = base + (base * item.tax_rate / 100) %}
-  {% set sub_total.val = sub_total.val + amt %}
-{% endfor %}
-{% set cgst_amt  = sub_total.val * invoice.cgst_rate  / 100 %}
-{% set sgst_amt  = sub_total.val * invoice.sgst_rate  / 100 %}
-{% set cgst2_amt = sub_total.val * invoice.cgst2_rate / 100 %}
-{% set sgst2_amt = sub_total.val * invoice.sgst2_rate / 100 %}
-{% set grand_total = sub_total.val + cgst_amt + sgst_amt + cgst2_amt + sgst2_amt + invoice.round_off %}
+{% set grand_total = invoice.grand_total %}
 
 <div class="no-print" style="margin-bottom:12px;">
   <button onclick="window.print()" style="padding:6px 16px;cursor:pointer;">🖨 Print</button>
@@ -78,7 +68,10 @@
   <!-- Header -->
   <div class="header">
     <div class="company-info">
-      <h3>{{ invoice.supplier_name or 'Your Company' }}</h3>
+      <h3>{{ shop.shop_name }}</h3>
+      {% if shop.address %}<p>{{ shop.address }}</p>{% endif %}
+      {% if shop.phone %}<p>📞 {{ shop.phone }}</p>{% endif %}
+      {% if shop.gstin %}<p>GSTIN: {{ shop.gstin }}</p>{% endif %}
     </div>
     <div>
       <div class="invoice-title-box"><h4>Tax Invoice</h4></div>
@@ -123,8 +116,7 @@
     </thead>
     <tbody>
       {% for item in items %}
-      {% set base = item.quantity * item.rate %}
-      {% set amt  = base + (base * item.tax_rate / 100) %}
+      {% set incl_amt = item.quantity * item.rate %}
       <tr>
         <td class="sno">{{ loop.index }}</td>
         <td>
@@ -141,7 +133,7 @@
         <td class="ctr">{{ item.quantity }}<br/><span style="font-size:9px;">Nos</span></td>
         <td class="num">{{ "%.2f"|format(item.rate) }}</td>
         <td class="ctr">{{ item.tax_label or '' }}{% if item.tax_rate %}<br/>({{ item.tax_rate }}%){% endif %}</td>
-        <td class="num"><strong>{{ "%.2f"|format(amt) }}</strong></td>
+        <td class="num"><strong>{{ "%.2f"|format(incl_amt) }}</strong></td>
       </tr>
       {% endfor %}
       <!-- padding rows for consistent look -->
@@ -151,8 +143,8 @@
     </tbody>
     <tfoot>
       <tr>
-        <td colspan="5" class="subtotal-label">Sub Total</td>
-        <td class="num">{{ "%.2f"|format(sub_total.val) }}</td>
+        <td colspan="5" class="subtotal-label">Sub Total (Taxable)</td>
+        <td class="num">{{ "%.2f"|format(invoice.total_taxable) }}</td>
       </tr>
     </tfoot>
   </table>
@@ -169,17 +161,11 @@
     </div>
     <div class="tax-summary">
       <table>
-        {% if invoice.cgst_rate %}
-        <tr><td>CGST {{ invoice.cgst_rate }}% on {{ "%.2f"|format(sub_total.val) }}</td><td style="text-align:right;">{{ "%.2f"|format(cgst_amt) }}</td></tr>
+        {% if invoice.total_cgst %}
+        <tr><td>CGST</td><td style="text-align:right;">{{ "%.2f"|format(invoice.total_cgst) }}</td></tr>
         {% endif %}
-        {% if invoice.sgst_rate %}
-        <tr><td>SGST {{ invoice.sgst_rate }}% on {{ "%.2f"|format(sub_total.val) }}</td><td style="text-align:right;">{{ "%.2f"|format(sgst_amt) }}</td></tr>
-        {% endif %}
-        {% if invoice.cgst2_rate %}
-        <tr><td>CGST {{ invoice.cgst2_rate }}% on {{ "%.2f"|format(sub_total.val) }}</td><td style="text-align:right;">{{ "%.2f"|format(cgst2_amt) }}</td></tr>
-        {% endif %}
-        {% if invoice.sgst2_rate %}
-        <tr><td>SGST {{ invoice.sgst2_rate }}% on {{ "%.2f"|format(sub_total.val) }}</td><td style="text-align:right;">{{ "%.2f"|format(sgst2_amt) }}</td></tr>
+        {% if invoice.total_sgst %}
+        <tr><td>SGST</td><td style="text-align:right;">{{ "%.2f"|format(invoice.total_sgst) }}</td></tr>
         {% endif %}
         {% if invoice.round_off %}
         <tr><td>Round Off</td><td style="text-align:right;">{{ "%.2f"|format(invoice.round_off) }}</td></tr>
@@ -194,7 +180,7 @@
   </div>
 
   <div class="signature">
-    <p><strong>For {{ invoice.supplier_name or 'Your Company' }}</strong></p>
+    <p><strong>For {{ shop.shop_name }}</strong></p>
     <br/><br/>
     <p>Authorized Signature</p>
   </div>
