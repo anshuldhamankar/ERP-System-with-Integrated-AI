@@ -1,90 +1,180 @@
 {% extends 'base.html' %}
-{% block title %}Transactions - ERP Lite{% endblock %}
+{% block title %}Transactions — DigiMart ERP{% endblock %}
+{% block page_title %}Transactions{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-  <h2 class="mb-4">💰 Transactions</h2>
-
-  <!-- Add Transaction Form -->
-  <div class="card mb-4">
-    <div class="card-header">Add New Transaction</div>
-    <div class="card-body">
-      <form method="POST" action="{{ url_for('add_transaction') }}">
-        <div class="row mb-3">
-          <div class="col-md-4">
-            <label for="product_id" class="form-label">Product</label>
-            <select name="product_id" id="product_id" class="form-select" required>
-              <option value="">-- Select Product --</option>
-              {% for product in products %}
-              <option value="{{ product.id }}">{{ product.name }} (Current Stock: {{ product.stock_quantity }})</option>
-              {% endfor %}
-            </select>
+<div class="row g-4">
+  <!-- Add Transaction -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="fas fa-plus-circle text-primary"></i> Add New Transaction
+      </div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('add_transaction') }}">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Product <span class="text-danger">*</span></label>
+              <select name="product_id" class="form-select" required>
+                <option value="">— Select Product —</option>
+                {% for product in products %}
+                <option value="{{ product.id }}">{{ product.name }} (Stock: {{ product.stock_quantity }})</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Type <span class="text-danger">*</span></label>
+              <select name="type" class="form-select" required>
+                <option value="purchase">Purchase</option>
+                <option value="sale">Sale</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Quantity <span class="text-danger">*</span></label>
+              <input type="number" class="form-control" name="quantity" required min="1" placeholder="0" />
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Unit Price (₹) <span class="text-danger">*</span></label>
+              <input type="number" class="form-control" name="unit_price" step="0.01" required placeholder="0.00" />
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Date <span class="text-danger">*</span></label>
+              <input type="date" class="form-control" name="date" value="{{ current_date }}" required />
+            </div>
           </div>
-          <div class="col-md-4">
-            <label for="type" class="form-label">Type</label>
-            <select name="type" id="type" class="form-select" required>
-              <option value="purchase">Purchase</option>
-              <option value="sale">Sale</option>
-            </select>
+          <div class="mt-3">
+            <button class="btn btn-primary"><i class="fas fa-plus me-1"></i>Add Transaction</button>
           </div>
-          <div class="col-md-4">
-            <label for="quantity" class="form-label">Quantity</label>
-            <input type="number" class="form-control" id="quantity" name="quantity" required min="1" />
-          </div>
-        </div>
-
-        <div class="row mb-3">
-          <div class="col-md-6">
-            <label for="unit_price" class="form-label">Unit Price (₹)</label>
-            <input type="number" class="form-control" name="unit_price" step="0.01" required />
-          </div>
-          <div class="col-md-6">
-            <label for="date" class="form-label">Date</label>
-            <input type="date" class="form-control" name="date" value="{{ current_date }}" required />
-          </div>
-        </div>
-
-        <button class="btn btn-primary">Add Transaction</button>
-      </form>
+        </form>
+      </div>
     </div>
   </div>
 
   <!-- Transactions Table -->
-  <div class="card">
-    <div class="card-header">Transaction History</div>
-    <div class="card-body table-responsive">
-      <table class="table table-bordered table-hover">
-        <thead class="table-dark">
-          <tr>
-            <th>ID</th>
-            <th>Product</th>
-            <th>Type</th>
-            <th>Qty</th>
-            <th>Price (₹)</th>
-            <th>Date</th>
-            <th>Actions</th> {# Added Actions column header #}
-          </tr>
-        </thead>
-        <tbody>
-          {% for txn in transactions %}
-          <tr class="{% if txn.type == 'sale' %}table-danger{% else %}table-success{% endif %}">
-            <td>{{ txn.id }}</td>
-            <td>{{ txn.product_name }}</td>
-            <td class="text-uppercase">{{ txn.type }}</td>
-            <td>{{ txn.quantity }}</td>
-            <td>₹{{ txn.unit_price }}</td>
-            <td>{{ txn.date.strftime('%Y-%m-%d') }}</td>
-            <td>
-              <a href="{{ url_for('edit_transaction', transaction_id=txn.id) }}" class="btn btn-sm btn-warning">Edit</a>
-              <form method="POST" action="{{ url_for('delete_transaction', transaction_id=txn.id) }}" style="display:inline;">
-                <button class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this transaction? This will adjust product stock.')">Delete</button>
-              </form>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="fas fa-list me-2 text-secondary"></i>Transaction History</span>
+        <div class="d-flex gap-2 align-items-center">
+          <input type="text" id="txnSearch" class="form-control form-control-sm" placeholder="🔍 Search..." style="width:200px;" />
+          <select id="txnFilter" class="form-select form-select-sm" style="width:130px;">
+            <option value="">All Types</option>
+            <option value="purchase">Purchase</option>
+            <option value="sale">Sale</option>
+          </select>
+          <span class="badge bg-secondary">{{ transactions|length }} records</span>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Product</th>
+                <th class="text-center">Type</th>
+                <th class="text-center">Qty</th>
+                <th class="text-end">Unit Price</th>
+                <th class="text-end">Total</th>
+                <th>Date</th>
+                <th class="text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="txnBody">
+              {% for txn in transactions %}
+              <tr data-type="{{ txn.type }}">
+                <td class="text-muted">{{ loop.index }}</td>
+                <td class="fw-semibold">{{ txn.product_name }}</td>
+                <td class="text-center">
+                  {% if txn.type == 'sale' %}
+                    <span class="badge bg-danger">Sale</span>
+                  {% else %}
+                    <span class="badge bg-success">Purchase</span>
+                  {% endif %}
+                </td>
+                <td class="text-center fw-semibold">{{ txn.quantity }}</td>
+                <td class="text-end">₹{{ "%.2f"|format(txn.unit_price) }}</td>
+                <td class="text-end fw-semibold">₹{{ "%.2f"|format(txn.unit_price * txn.quantity) }}</td>
+                <td class="text-muted">{{ txn.date.strftime('%d %b %Y') }}</td>
+                <td class="text-center">
+                  <div class="d-flex gap-1 justify-content-center">
+                    <a href="{{ url_for('edit_transaction', transaction_id=txn.id) }}" class="btn btn-sm btn-outline-warning" title="Edit">
+                      <i class="fas fa-pen"></i>
+                    </a>
+                    <form method="POST" action="{{ url_for('delete_transaction', transaction_id=txn.id) }}" style="display:inline;">
+                      <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this transaction? Stock will be adjusted.')" title="Delete">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="8" class="text-center text-muted py-4">No transactions yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <!-- Pagination -->
+        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-top">
+          <small class="text-muted" id="txnPaginationInfo"></small>
+          <nav><ul class="pagination pagination-sm mb-0" id="txnPagination"></ul></nav>
+        </div>
+      </div>
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+  const ROWS_PER_PAGE = 20;
+  let currentPage = 1;
+  let visibleRows = [];
+
+  function filterAndPaginate() {
+    const q = document.getElementById('txnSearch').value.toLowerCase();
+    const type = document.getElementById('txnFilter').value;
+    const allRows = Array.from(document.querySelectorAll('#txnBody tr[data-type]'));
+    visibleRows = allRows.filter(r => {
+      const matchQ = !q || r.textContent.toLowerCase().includes(q);
+      const matchT = !type || r.dataset.type === type;
+      return matchQ && matchT;
+    });
+    allRows.forEach(r => r.style.display = 'none');
+    currentPage = 1;
+    renderPage();
+  }
+
+  function renderPage() {
+    const start = (currentPage - 1) * ROWS_PER_PAGE;
+    const end = start + ROWS_PER_PAGE;
+    visibleRows.forEach((r, i) => r.style.display = (i >= start && i < end) ? '' : 'none');
+    const total = visibleRows.length;
+    const pages = Math.ceil(total / ROWS_PER_PAGE);
+    document.getElementById('txnPaginationInfo').textContent =
+      `Showing ${Math.min(start+1,total)}–${Math.min(end,total)} of ${total} records`;
+    const pg = document.getElementById('txnPagination');
+    pg.innerHTML = '';
+    if (pages <= 1) return;
+    const mkBtn = (label, page, disabled, active) => {
+      const li = document.createElement('li');
+      li.className = `page-item${disabled?' disabled':''}${active?' active':''}`;
+      li.innerHTML = `<a class="page-link" href="#">${label}</a>`;
+      if (!disabled) li.querySelector('a').addEventListener('click', e => { e.preventDefault(); currentPage = page; renderPage(); });
+      return li;
+    };
+    pg.appendChild(mkBtn('‹', currentPage-1, currentPage===1));
+    for (let i=1; i<=pages; i++) pg.appendChild(mkBtn(i, i, false, i===currentPage));
+    pg.appendChild(mkBtn('›', currentPage+1, currentPage===pages));
+  }
+
+  document.getElementById('txnSearch').addEventListener('input', filterAndPaginate);
+  document.getElementById('txnFilter').addEventListener('change', filterAndPaginate);
+  document.addEventListener('DOMContentLoaded', () => {
+    visibleRows = Array.from(document.querySelectorAll('#txnBody tr[data-type]'));
+    renderPage();
+  });
+</script>
 {% endblock %}

@@ -1,89 +1,151 @@
 {% extends 'base.html' %}
-{% block title %}Stock{% endblock %}
+{% block title %}Stock — DigiMart ERP{% endblock %}
+{% block page_title %}Current Stock{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2 class="mb-0">🗃️ Current Stock</h2>
-    <a href="{{ url_for('add_stock') }}" class="btn btn-success">+ Add Stock</a>
-  </div>
-
-  <!-- Summary -->
-  <div class="row mb-3">
-    <div class="col-md-3">
-      <div class="card text-bg-primary text-center p-3">
-        <div class="small">Total Items</div>
-        <div class="fs-4 fw-bold">{{ items|length }}</div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card text-bg-success text-center p-3">
-        <div class="small">Stock Value (Selling)</div>
-        <div class="fs-4 fw-bold">₹ {{ "{:,.2f}".format(total_value) }}</div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card text-bg-danger text-center p-3">
-        <div class="small">Low Stock (&lt; 10)</div>
-        <div class="fs-4 fw-bold">{{ items | selectattr('stock_quantity', 'lt', 10) | list | length }}</div>
-      </div>
+<!-- Stat Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card stat-indigo">
+      <i class="fas fa-boxes-stacked stat-icon"></i>
+      <div class="stat-label">Total Items</div>
+      <div class="stat-value">{{ items|length }}</div>
+      <div class="stat-sub">Unique products</div>
     </div>
   </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card stat-emerald">
+      <i class="fas fa-indian-rupee-sign stat-icon"></i>
+      <div class="stat-label">Stock Value</div>
+      <div class="stat-value">₹{{ "{:,.0f}".format(total_value) }}</div>
+      <div class="stat-sub">At selling price</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card stat-rose">
+      <i class="fas fa-triangle-exclamation stat-icon"></i>
+      <div class="stat-label">Low Stock</div>
+      <div class="stat-value">{{ items | selectattr('stock_quantity', 'lt', 10) | list | length }}</div>
+      <div class="stat-sub">Below 10 units</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card stat-sky">
+      <i class="fas fa-check-circle stat-icon"></i>
+      <div class="stat-label">Well Stocked</div>
+      <div class="stat-value">{{ items | selectattr('stock_quantity', 'ge', 10) | list | length }}</div>
+      <div class="stat-sub">10+ units available</div>
+    </div>
+  </div>
+</div>
 
-  <!-- Search -->
-  <form method="GET" action="{{ url_for('stock') }}" class="mb-3 d-flex gap-2">
-    <input type="text" name="q" class="form-control" placeholder="🔍 Search by name or SKU..." value="{{ search }}" />
-    <button type="submit" class="btn btn-outline-primary">Search</button>
-    {% if search %}<a href="{{ url_for('stock') }}" class="btn btn-outline-secondary">Clear</a>{% endif %}
-  </form>
-
-  <!-- Stock Table -->
-  <div class="card">
-    <div class="card-body p-0 table-responsive">
-      <table class="table table-bordered table-hover mb-0">
-        <thead class="table-dark">
+<!-- Stock Table -->
+<div class="card">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <span><i class="fas fa-boxes-stacked me-2 text-secondary"></i>Stock Register</span>
+    <div class="d-flex gap-2 align-items-center">
+      <form method="GET" action="{{ url_for('stock') }}" class="d-flex gap-2">
+        <input type="text" name="q" class="form-control form-control-sm" placeholder="🔍 Search name or SKU..." value="{{ search }}" style="width:220px;" />
+        <button type="submit" class="btn btn-sm btn-outline-primary">Search</button>
+        {% if search %}<a href="{{ url_for('stock') }}" class="btn btn-sm btn-outline-secondary">Clear</a>{% endif %}
+      </form>
+      <a href="{{ url_for('add_stock') }}" class="btn btn-sm btn-primary"><i class="fas fa-plus me-1"></i>Add Stock</a>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0" id="stockTable">
+        <thead>
           <tr>
             <th>#</th>
             <th>Item Name</th>
             <th>SKU</th>
-            <th>Company / Brand</th>
+            <th>Brand / Company</th>
             <th>Supplier</th>
             <th class="text-center">Stock Qty</th>
-            <th class="text-end">Selling Price (₹)</th>
-            <th class="text-end">Stock Value (₹)</th>
+            <th class="text-end">Selling Price</th>
+            <th class="text-end">Stock Value</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="stockBody">
           {% for item in items %}
-          <tr class="{% if item.stock_quantity < 10 %}table-danger{% endif %}">
-            <td>{{ loop.index }}</td>
-            <td class="fw-bold">{{ item.name }}</td>
-            <td><code>{{ item.sku }}</code></td>
-            <td>{{ item.company or '—' }}</td>
-            <td>{{ item.supplier_name or '—' }}</td>
+          <tr>
+            <td class="text-muted">{{ loop.index }}</td>
+            <td class="fw-semibold">{{ item.name }}</td>
+            <td><code class="text-muted">{{ item.sku }}</code></td>
+            <td class="text-muted">{{ item.company or '—' }}</td>
+            <td class="text-muted">{{ item.supplier_name or '—' }}</td>
             <td class="text-center">
-              {{ item.stock_quantity }}
-              {% if item.stock_quantity < 10 %}
-                <span class="badge bg-danger ms-1">Low</span>
+              {% if item.stock_quantity == 0 %}
+                <span class="badge bg-danger">Out of Stock</span>
+              {% elif item.stock_quantity < 10 %}
+                <span class="badge bg-warning text-dark">{{ item.stock_quantity }} — Low</span>
+              {% elif item.stock_quantity < 50 %}
+                <span class="badge bg-info text-dark">{{ item.stock_quantity }}</span>
+              {% else %}
+                <span class="badge bg-success">{{ item.stock_quantity }}</span>
               {% endif %}
             </td>
-            <td class="text-end">₹ {{ "%.2f"|format(item.unit_price) }}</td>
-            <td class="text-end">₹ {{ "%.2f"|format(item.stock_quantity * item.unit_price) }}</td>
+            <td class="text-end">₹{{ "%.2f"|format(item.unit_price) }}</td>
+            <td class="text-end fw-semibold">₹{{ "%.2f"|format(item.stock_quantity * item.unit_price) }}</td>
           </tr>
           {% else %}
-          <tr><td colspan="8" class="text-center text-muted py-4">No stock found{% if search %} for "{{ search }}"{% endif %}.</td></tr>
+          <tr>
+            <td colspan="8" class="text-center text-muted py-5">
+              No stock found{% if search %} for "{{ search }}"{% endif %}.
+            </td>
+          </tr>
           {% endfor %}
         </tbody>
         {% if items %}
-        <tfoot class="table-dark fw-bold">
-          <tr>
+        <tfoot>
+          <tr class="table-light fw-bold">
             <td colspan="7" class="text-end">Total Stock Value</td>
-            <td class="text-end">₹ {{ "{:,.2f}".format(total_value) }}</td>
+            <td class="text-end text-success">₹{{ "{:,.2f}".format(total_value) }}</td>
           </tr>
         </tfoot>
         {% endif %}
       </table>
     </div>
+    <!-- Pagination -->
+    <div class="d-flex justify-content-between align-items-center px-3 py-2 border-top">
+      <small class="text-muted" id="stockPaginationInfo"></small>
+      <nav><ul class="pagination pagination-sm mb-0" id="stockPagination"></ul></nav>
+    </div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+  const ROWS_PER_PAGE = 25;
+  let currentPage = 1;
+  let visibleRows = Array.from(document.querySelectorAll('#stockBody tr'));
+
+  function renderPage() {
+    const start = (currentPage - 1) * ROWS_PER_PAGE;
+    const end = start + ROWS_PER_PAGE;
+    visibleRows.forEach((r, i) => r.style.display = (i >= start && i < end) ? '' : 'none');
+    const total = visibleRows.length;
+    const pages = Math.ceil(total / ROWS_PER_PAGE);
+    document.getElementById('stockPaginationInfo').textContent =
+      `Showing ${Math.min(start+1,total)}–${Math.min(end,total)} of ${total} items`;
+    const pg = document.getElementById('stockPagination');
+    pg.innerHTML = '';
+    if (pages <= 1) return;
+    const mkBtn = (label, page, disabled, active) => {
+      const li = document.createElement('li');
+      li.className = `page-item${disabled?' disabled':''}${active?' active':''}`;
+      li.innerHTML = `<a class="page-link" href="#">${label}</a>`;
+      if (!disabled) li.querySelector('a').addEventListener('click', e => { e.preventDefault(); currentPage = page; renderPage(); });
+      return li;
+    };
+    pg.appendChild(mkBtn('‹', currentPage-1, currentPage===1));
+    for (let i=1; i<=pages; i++) pg.appendChild(mkBtn(i, i, false, i===currentPage));
+    pg.appendChild(mkBtn('›', currentPage+1, currentPage===pages));
+  }
+
+  document.addEventListener('DOMContentLoaded', renderPage);
+</script>
 {% endblock %}

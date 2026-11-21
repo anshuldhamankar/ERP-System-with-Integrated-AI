@@ -1,66 +1,107 @@
 {% extends 'base.html' %}
-{% block title %}Suppliers - ERP Lite{% endblock %}
+{% block title %}Suppliers — DigiMart ERP{% endblock %}
+{% block page_title %}Suppliers{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-  <h2 class="mb-4">🏭 Suppliers</h2>
-
-  <!-- Add Supplier Form -->
-  <div class="card mb-4">
-    <div class="card-header">Add New Supplier</div>
-    <div class="card-body">
-      <form method="POST" action="{{ url_for('add_supplier') }}">
-        <div class="row mb-3">
-          <div class="col-md-6">
-            <label for="name" class="form-label">Supplier Name</label>
-            <input type="text" class="form-control" id="name" name="name" required />
+<div class="row g-4">
+  <!-- Add Supplier -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="fas fa-plus-circle text-primary"></i> Add New Supplier
+      </div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('add_supplier') }}">
+          <div class="row g-3 align-items-end">
+            <div class="col-md-5">
+              <label class="form-label">Supplier Name <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" name="name" required placeholder="e.g. MedLine Distributors" />
+            </div>
+            <div class="col-md-5">
+              <label class="form-label">Contact Email</label>
+              <input type="email" class="form-control" name="contact_email" placeholder="supplier@example.com" />
+            </div>
+            <div class="col-md-2">
+              <button type="submit" class="btn btn-primary w-100"><i class="fas fa-plus me-1"></i>Add</button>
+            </div>
           </div>
-          <div class="col-md-6">
-            <label for="contact_email" class="form-label">Contact Email</label>
-            <input type="email" class="form-control" id="contact_email" name="contact_email" />
-          </div>
-        </div>
-        <button type="submit" class="btn btn-primary">Add Supplier</button>
-      </form>
+        </form>
+      </div>
     </div>
   </div>
 
   <!-- Suppliers Table -->
-  <div class="card">
-    <div class="card-header">All Suppliers</div>
-    <div class="card-body table-responsive">
-      <table class="table table-hover table-bordered">
-        <thead class="table-dark">
-          <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Products Supplied</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for supplier in suppliers %}
-          <tr>
-            <td>{{ supplier.id }}</td>
-            <td>{{ supplier.name }}</td>
-            <td>{{ supplier.contact_email or '—' }}</td>
-            <td>{{ supplier.product_count }}</td>
-            <td>
-              {% if supplier.product_count == 0 %}
-              <form method="POST" action="{{ url_for('delete_supplier', supplier_id=supplier.id) }}" style="display:inline;">
-                <button class="btn btn-sm btn-danger" onclick="return confirm('Delete this supplier?')">Delete</button>
-              </form>
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="fas fa-truck me-2 text-secondary"></i>All Suppliers</span>
+        <div class="d-flex gap-2 align-items-center">
+          <input type="text" id="supplierSearch" class="form-control form-control-sm" placeholder="🔍 Search..." style="width:200px;" />
+          <span class="badge bg-secondary">{{ suppliers|length }} suppliers</span>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Supplier Name</th>
+                <th>Email</th>
+                <th class="text-center">Products</th>
+                <th class="text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="supplierBody">
+              {% for supplier in suppliers %}
+              <tr>
+                <td class="text-muted">{{ loop.index }}</td>
+                <td class="fw-semibold">{{ supplier.name }}</td>
+                <td class="text-muted">{{ supplier.contact_email or '—' }}</td>
+                <td class="text-center">
+                  <span class="badge {% if supplier.product_count > 0 %}bg-primary{% else %}bg-light text-muted{% endif %}">
+                    {{ supplier.product_count }}
+                  </span>
+                </td>
+                <td class="text-center">
+                  <div class="d-flex gap-1 justify-content-center">
+                    <a href="{{ url_for('edit_supplier', supplier_id=supplier.id) }}" class="btn btn-sm btn-outline-warning" title="Edit">
+                      <i class="fas fa-pen"></i>
+                    </a>
+                    {% if supplier.product_count == 0 %}
+                    <form method="POST" action="{{ url_for('delete_supplier', supplier_id=supplier.id) }}" style="display:inline;">
+                      <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this supplier?')" title="Delete">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </form>
+                    {% else %}
+                    <span class="btn btn-sm btn-outline-secondary disabled" title="In use — cannot delete">
+                      <i class="fas fa-lock"></i>
+                    </span>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
               {% else %}
-              <span class="text-muted">In use</span>
-              {% endif %}
-              <a href="{{ url_for('edit_supplier', supplier_id=supplier.id) }}" class="btn btn-sm btn-warning">Edit</a>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+              <tr><td colspan="5" class="text-center text-muted py-4">No suppliers yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+  document.getElementById('supplierSearch').addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    document.querySelectorAll('#supplierBody tr').forEach(r => {
+      r.style.display = r.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  });
+</script>
 {% endblock %}

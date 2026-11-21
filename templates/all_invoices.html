@@ -1,89 +1,124 @@
 {% extends 'base.html' %}
-{% block title %}All Invoices{% endblock %}
+{% block title %}All Invoices — DigiMart ERP{% endblock %}
+{% block page_title %}All Invoices{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2 class="mb-0">🧾 All Invoices</h2>
-    <a href="{{ url_for('billing') }}" class="btn btn-success">+ New Invoice</a>
-  </div>
-
-  <!-- Summary -->
-  <div class="row mb-3 g-3">
-    <div class="col-md-3">
-      <div class="card text-bg-primary text-center p-3">
-        <div class="small">Total Invoices</div>
-        <div class="fs-4 fw-bold">{{ invoices|length }}</div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card text-bg-success text-center p-3">
-        <div class="small">Total Revenue</div>
-        <div class="fs-4 fw-bold">₹ {{ "{:,.2f}".format(total_revenue) }}</div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card text-bg-warning text-center p-3">
-        <div class="small">Cash Bills</div>
-        <div class="fs-4 fw-bold">{{ invoices | selectattr('bill_type','equalto','cash') | list | length }}</div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card text-bg-danger text-center p-3">
-        <div class="small">Credit Bills</div>
-        <div class="fs-4 fw-bold">{{ invoices | selectattr('bill_type','equalto','credit') | list | length }}</div>
-      </div>
+<!-- Stat Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card stat-indigo">
+      <i class="fas fa-receipt stat-icon"></i>
+      <div class="stat-label">Total Invoices</div>
+      <div class="stat-value">{{ invoices|length }}</div>
+      <div class="stat-sub">All time</div>
     </div>
   </div>
-
-  <!-- Search -->
-  <div class="mb-3 d-flex gap-2">
-    <input type="text" id="invSearch" class="form-control" placeholder="🔍 Search by invoice #, customer..." />
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card stat-emerald">
+      <i class="fas fa-indian-rupee-sign stat-icon"></i>
+      <div class="stat-label">Total Revenue</div>
+      <div class="stat-value">₹{{ "{:,.0f}".format(total_revenue) }}</div>
+      <div class="stat-sub">GST inclusive</div>
+    </div>
   </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card stat-emerald">
+      <i class="fas fa-money-bill-wave stat-icon"></i>
+      <div class="stat-label">Cash Bills</div>
+      <div class="stat-value">{{ invoices | selectattr('bill_type','equalto','cash') | list | length }}</div>
+      <div class="stat-sub">Immediate payment</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card stat-amber">
+      <i class="fas fa-clock stat-icon"></i>
+      <div class="stat-label">Credit Bills</div>
+      <div class="stat-value">{{ invoices | selectattr('bill_type','equalto','credit') | list | length }}</div>
+      <div class="stat-sub">Pending collection</div>
+    </div>
+  </div>
+</div>
 
-  <div class="card">
-    <div class="card-body p-0 table-responsive">
-      <table class="table table-bordered table-hover mb-0">
-        <thead class="table-dark">
+<!-- Invoices Table -->
+<div class="card">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <span><i class="fas fa-receipt me-2 text-secondary"></i>Invoice List</span>
+    <div class="d-flex gap-2 align-items-center">
+      <input type="text" id="invSearch" class="form-control form-control-sm" placeholder="🔍 Search invoice, customer..." style="width:240px;" />
+      <select id="invTypeFilter" class="form-select form-select-sm" style="width:130px;">
+        <option value="">All Types</option>
+        <option value="cash">Cash</option>
+        <option value="credit">Credit</option>
+      </select>
+      <a href="{{ url_for('billing') }}" class="btn btn-sm btn-primary"><i class="fas fa-plus me-1"></i>New Invoice</a>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
           <tr>
-            <th>Invoice #</th><th>Date</th><th>Type</th><th>Customer</th>
-            <th class="text-end">Taxable</th><th class="text-end">CGST</th>
-            <th class="text-end">SGST</th><th class="text-end">Total</th><th>Actions</th>
+            <th>Invoice #</th>
+            <th>Date</th>
+            <th class="text-center">Type</th>
+            <th>Customer</th>
+            <th class="text-end">Taxable</th>
+            <th class="text-end">CGST</th>
+            <th class="text-end">SGST</th>
+            <th class="text-end">Grand Total</th>
+            <th class="text-center">Actions</th>
           </tr>
         </thead>
         <tbody id="invBody">
           {% for inv in invoices %}
-          <tr>
-            <td class="fw-bold">{{ inv.invoice_number }}</td>
-            <td>{{ inv.invoice_date }}</td>
-            <td><span class="badge {% if inv.bill_type=='cash' %}bg-success{% else %}bg-warning text-dark{% endif %}">{{ (inv.bill_type or 'cash')|upper }}</span></td>
-            <td>{{ inv.bill_to_name }}</td>
+          <tr data-type="{{ inv.bill_type or 'cash' }}">
+            <td class="fw-bold text-primary">{{ inv.invoice_number }}</td>
+            <td class="text-muted">{{ inv.invoice_date }}</td>
+            <td class="text-center">
+              <span class="badge {% if inv.bill_type=='cash' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                {{ (inv.bill_type or 'cash')|upper }}
+              </span>
+            </td>
+            <td class="fw-semibold">{{ inv.bill_to_name }}</td>
             <td class="text-end">₹{{ "%.2f"|format(inv.total_taxable or 0) }}</td>
-            <td class="text-end">₹{{ "%.2f"|format(inv.total_cgst or 0) }}</td>
-            <td class="text-end">₹{{ "%.2f"|format(inv.total_sgst or 0) }}</td>
-            <td class="text-end fw-bold">₹{{ "%.2f"|format(inv.grand_total or 0) }}</td>
-            <td>
-              <a href="{{ url_for('invoice_detail', invoice_id=inv.id) }}" class="btn btn-sm btn-info">View</a>
-              <a href="{{ url_for('invoice_print', invoice_id=inv.id) }}" class="btn btn-sm btn-secondary" target="_blank">Print</a>
-              <form method="POST" action="{{ url_for('delete_invoice', invoice_id=inv.id) }}" style="display:inline;">
-                <button class="btn btn-sm btn-danger" onclick="return confirm('Delete?')">Del</button>
-              </form>
+            <td class="text-end text-muted">₹{{ "%.2f"|format(inv.total_cgst or 0) }}</td>
+            <td class="text-end text-muted">₹{{ "%.2f"|format(inv.total_sgst or 0) }}</td>
+            <td class="text-end fw-bold text-success">₹{{ "%.2f"|format(inv.grand_total or 0) }}</td>
+            <td class="text-center">
+              <div class="d-flex gap-1 justify-content-center">
+                <a href="{{ url_for('invoice_detail', invoice_id=inv.id) }}" class="btn btn-sm btn-outline-primary" title="View">
+                  <i class="fas fa-eye"></i>
+                </a>
+                <a href="{{ url_for('invoice_print', invoice_id=inv.id) }}" class="btn btn-sm btn-outline-secondary" target="_blank" title="Print">
+                  <i class="fas fa-print"></i>
+                </a>
+                <form method="POST" action="{{ url_for('delete_invoice', invoice_id=inv.id) }}" style="display:inline;">
+                  <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this invoice?')" title="Delete">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </form>
+              </div>
             </td>
           </tr>
           {% else %}
-          <tr><td colspan="9" class="text-center text-muted py-3">No invoices yet.</td></tr>
+          <tr><td colspan="9" class="text-center text-muted py-5">No invoices yet. <a href="{{ url_for('billing') }}">Create one →</a></td></tr>
           {% endfor %}
         </tbody>
         {% if invoices %}
-        <tfoot class="table-dark fw-bold">
-          <tr>
+        <tfoot>
+          <tr class="table-light fw-bold">
             <td colspan="7" class="text-end">Grand Total</td>
-            <td class="text-end">₹ {{ "{:,.2f}".format(total_revenue) }}</td>
+            <td class="text-end text-success">₹{{ "{:,.2f}".format(total_revenue) }}</td>
             <td></td>
           </tr>
         </tfoot>
         {% endif %}
       </table>
+    </div>
+    <!-- Pagination -->
+    <div class="d-flex justify-content-between align-items-center px-3 py-2 border-top">
+      <small class="text-muted" id="invPaginationInfo"></small>
+      <nav><ul class="pagination pagination-sm mb-0" id="invPagination"></ul></nav>
     </div>
   </div>
 </div>
@@ -92,11 +127,52 @@
 {% block scripts %}
 {{ super() }}
 <script>
-  document.getElementById('invSearch').addEventListener('input', function() {
-    const q = this.value.toLowerCase();
-    document.querySelectorAll('#invBody tr').forEach(row => {
-      row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+  const ROWS_PER_PAGE = 20;
+  let currentPage = 1;
+  let visibleRows = [];
+
+  function filterAndPaginate() {
+    const q = document.getElementById('invSearch').value.toLowerCase();
+    const type = document.getElementById('invTypeFilter').value;
+    const allRows = Array.from(document.querySelectorAll('#invBody tr[data-type]'));
+    visibleRows = allRows.filter(r => {
+      const matchQ = !q || r.textContent.toLowerCase().includes(q);
+      const matchT = !type || r.dataset.type === type;
+      return matchQ && matchT;
     });
+    allRows.forEach(r => r.style.display = 'none');
+    currentPage = 1;
+    renderPage();
+  }
+
+  function renderPage() {
+    const start = (currentPage - 1) * ROWS_PER_PAGE;
+    const end = start + ROWS_PER_PAGE;
+    visibleRows.forEach((r, i) => r.style.display = (i >= start && i < end) ? '' : 'none');
+    const total = visibleRows.length;
+    const pages = Math.ceil(total / ROWS_PER_PAGE);
+    document.getElementById('invPaginationInfo').textContent =
+      `Showing ${Math.min(start+1,total)}–${Math.min(end,total)} of ${total} invoices`;
+    const pg = document.getElementById('invPagination');
+    pg.innerHTML = '';
+    if (pages <= 1) return;
+    const mkBtn = (label, page, disabled, active) => {
+      const li = document.createElement('li');
+      li.className = `page-item${disabled?' disabled':''}${active?' active':''}`;
+      li.innerHTML = `<a class="page-link" href="#">${label}</a>`;
+      if (!disabled) li.querySelector('a').addEventListener('click', e => { e.preventDefault(); currentPage = page; renderPage(); });
+      return li;
+    };
+    pg.appendChild(mkBtn('‹', currentPage-1, currentPage===1));
+    for (let i=1; i<=pages; i++) pg.appendChild(mkBtn(i, i, false, i===currentPage));
+    pg.appendChild(mkBtn('›', currentPage+1, currentPage===pages));
+  }
+
+  document.getElementById('invSearch').addEventListener('input', filterAndPaginate);
+  document.getElementById('invTypeFilter').addEventListener('change', filterAndPaginate);
+  document.addEventListener('DOMContentLoaded', () => {
+    visibleRows = Array.from(document.querySelectorAll('#invBody tr[data-type]'));
+    renderPage();
   });
 </script>
 {% endblock %}

@@ -1,80 +1,112 @@
 {% extends 'base.html' %}
-{% block title %}Dashboard - ERP Lite{% endblock %}
+{% block title %}Dashboard — DigiMart ERP{% endblock %}
+{% block page_title %}Dashboard Overview{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-  <h2 class="mb-4">📊 Dashboard Overview</h2>
-
-  <!-- Summary Cards -->
-  <div class="row mb-4">
-
-    <div class="col-md-3">
-      <div class="card text-bg-primary">
-        <div class="card-body">
-          <h5 class="card-title">Total Products</h5>
-          <p class="card-text display-6">{{ total_products }}</p>
-        </div>
-      </div>
+<!-- Stat Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card stat-indigo">
+      <i class="fas fa-boxes-stacked stat-icon"></i>
+      <div class="stat-label">Total Products</div>
+      <div class="stat-value">{{ total_products }}</div>
+      <div class="stat-sub">Active SKUs in inventory</div>
     </div>
-
-    <div class="col-md-3">
-      <div class="card text-bg-success">
-        <div class="card-body">
-          <h5 class="card-title">Total Stock Value (₹)</h5>
-          <p class="card-text display-6">₹ {{ total_value }}</p>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-md-3">
-      <div class="card text-bg-danger">
-        <div class="card-body">
-          <h5 class="card-title">Low Stock Products</h5>
-          <p class="card-text display-6">{{ low_stock_count }}</p>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-md-3">
-      <div class="card text-bg-secondary">
-        <div class="card-body">
-          <h5 class="card-title">Total Transactions</h5>
-          <p class="card-text display-6">{{ total_transactions }}</p>
-        </div>
-      </div>
-    </div>
-
   </div>
-
-  <!-- Low Stock Product Table -->
-  <div class="card">
-    <div class="card-header bg-warning">
-      ⚠️ Products Running Low on Stock
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card stat-emerald">
+      <i class="fas fa-indian-rupee-sign stat-icon"></i>
+      <div class="stat-label">Total Stock Value</div>
+      <div class="stat-value">₹{{ "{:,.0f}".format(total_value) }}</div>
+      <div class="stat-sub">At current selling price</div>
     </div>
-    <div class="card-body table-responsive">
-      <table class="table table-bordered table-hover">
-        <thead class="table-dark">
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card stat-rose">
+      <i class="fas fa-triangle-exclamation stat-icon"></i>
+      <div class="stat-label">Low Stock Alerts</div>
+      <div class="stat-value">{{ low_stock_count }}</div>
+      <div class="stat-sub">Products below 10 units</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card stat-amber">
+      <i class="fas fa-arrow-right-arrow-left stat-icon"></i>
+      <div class="stat-label">Total Transactions</div>
+      <div class="stat-value">{{ total_transactions }}</div>
+      <div class="stat-sub">Purchases &amp; sales combined</div>
+    </div>
+  </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row g-3 mb-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="fas fa-bolt text-warning"></i> Quick Actions
+      </div>
+      <div class="card-body d-flex flex-wrap gap-2 py-3">
+        <a href="{{ url_for('billing') }}" class="btn btn-primary"><i class="fas fa-file-invoice me-1"></i>New Invoice</a>
+        <a href="{{ url_for('add_stock') }}" class="btn btn-success"><i class="fas fa-plus me-1"></i>Add Stock</a>
+        <a href="{{ url_for('parties') }}" class="btn btn-outline-secondary"><i class="fas fa-users me-1"></i>Parties</a>
+        <a href="{{ url_for('reports') }}" class="btn btn-outline-secondary"><i class="fas fa-chart-bar me-1"></i>Reports</a>
+        <a href="{{ url_for('ai_service') }}" class="btn btn-outline-secondary"><i class="fas fa-robot me-1"></i>AI Assistant</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Low Stock Table -->
+<div class="card">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <span><i class="fas fa-triangle-exclamation text-warning me-2"></i>Products Running Low on Stock</span>
+    <a href="{{ url_for('stock') }}" class="btn btn-sm btn-outline-secondary">View All Stock</a>
+  </div>
+  <div class="card-body p-0">
+    {% if low_stock_products %}
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
           <tr>
-            <th>ID</th>
-            <th>Name</th>
+            <th>#</th>
+            <th>Product Name</th>
             <th>SKU</th>
-            <th>Stock</th>
+            <th class="text-center">Stock Qty</th>
             <th>Supplier</th>
+            <th>Status</th>
           </tr>
         </thead>
         <tbody>
           {% for product in low_stock_products %}
-          <tr class="{% if product.stock_quantity == 0 %}table-danger{% else %}table-warning{% endif %}">
-            <td>{{ product.id }}</td>
-            <td>{{ product.name }}</td>
-            <td>{{ product.sku }}</td>
-            <td>{{ product.stock_quantity }}</td>
-            <td>{{ product.supplier_name }}</td>
+          <tr>
+            <td class="text-muted">{{ loop.index }}</td>
+            <td class="fw-semibold">{{ product.name }}</td>
+            <td><code class="text-muted">{{ product.sku }}</code></td>
+            <td class="text-center">
+              <span class="fw-bold {% if product.stock_quantity == 0 %}text-danger{% else %}text-warning{% endif %}">
+                {{ product.stock_quantity }}
+              </span>
+            </td>
+            <td>{{ product.supplier_name or '—' }}</td>
+            <td>
+              {% if product.stock_quantity == 0 %}
+                <span class="badge bg-danger">Out of Stock</span>
+              {% else %}
+                <span class="badge bg-warning text-dark">Low Stock</span>
+              {% endif %}
+            </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+    {% else %}
+    <div class="text-center py-5 text-muted">
+      <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+      <p class="mb-0">All products are well stocked!</p>
+    </div>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

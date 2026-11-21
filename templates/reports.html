@@ -1,232 +1,182 @@
 {% extends 'base.html' %}
-{% block title %}Reports - ERP Lite{% endblock %}
+{% block title %}Reports — DigiMart ERP{% endblock %}
+{% block page_title %}Reports & Analytics{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-  <h2 class="mb-4">📊 Inventory Reports & Analytics</h2>
-
-  <!-- Inventory Summary Cards -->
-  <div class="row mb-4">
-    <div class="col-md-3">
-      <div class="card text-bg-success">
-        <div class="card-body">
-          <h5>Total Inventory Value</h5>
-          <p class="display-6">₹ {{ total_value }}</p>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card text-bg-danger">
-        <div class="card-body">
-          <h5>Low Stock Products</h5>
-          <p class="display-6">{{ low_stock_count }}</p>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card text-bg-primary">
-        <div class="card-body">
-          <h5>Suppliers Count</h5>
-          <p class="display-6">{{ supplier_count }}</p>
-        </div>
-      </div>
-    </div>
-    {# NEW: Total Net Profit Card #}
-    <div class="col-md-3">
-      <div class="card text-bg-info">
-        <div class="card-body">
-          <h5>Total Net Profit</h5>
-          <p class="display-6">₹ {{ "{:,.2f}".format(total_net_profit) }}</p>
-        </div>
-      </div>
+<!-- Stat Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card stat-emerald">
+      <i class="fas fa-warehouse stat-icon"></i>
+      <div class="stat-label">Total Inventory Value</div>
+      <div class="stat-value">₹{{ "{:,.0f}".format(total_value) }}</div>
+      <div class="stat-sub">At current selling price</div>
     </div>
   </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card stat-rose">
+      <i class="fas fa-triangle-exclamation stat-icon"></i>
+      <div class="stat-label">Low Stock Products</div>
+      <div class="stat-value">{{ low_stock_count }}</div>
+      <div class="stat-sub">Below 10 units</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card stat-indigo">
+      <i class="fas fa-truck stat-icon"></i>
+      <div class="stat-label">Suppliers</div>
+      <div class="stat-value">{{ supplier_count }}</div>
+      <div class="stat-sub">Active suppliers</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card stat-violet">
+      <i class="fas fa-chart-line stat-icon"></i>
+      <div class="stat-label">Total Net Profit</div>
+      <div class="stat-value">₹{{ "{:,.0f}".format(total_net_profit) }}</div>
+      <div class="stat-sub">All invoices combined</div>
+    </div>
+  </div>
+</div>
 
-  <!-- Low Stock Table -->
-  <div class="card mb-4">
-    <div class="card-header bg-warning fw-bold">⚠️ Products Running Low</div>
-    <div class="card-body table-responsive">
-      <table class="table table-striped table-hover">
-        <thead class="table-dark">
-          <tr>
-            <th>ID</th><th>Name</th><th>Stock</th><th>Supplier</th>
-          </tr>
+<!-- Low Stock Table -->
+<div class="card mb-4">
+  <div class="card-header d-flex align-items-center gap-2">
+    <i class="fas fa-triangle-exclamation text-warning"></i> Products Running Low
+  </div>
+  <div class="card-body p-0">
+    {% if low_stock_products %}
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr><th>#</th><th>Name</th><th class="text-center">Stock</th><th>Supplier</th><th>Status</th></tr>
         </thead>
         <tbody>
           {% for p in low_stock_products %}
           <tr>
-            <td>{{ p.id }}</td>
-            <td>{{ p.name }}</td>
-            <td>{{ p.stock_quantity }}</td>
-            <td>{{ p.supplier_name }}</td>
+            <td class="text-muted">{{ loop.index }}</td>
+            <td class="fw-semibold">{{ p.name }}</td>
+            <td class="text-center fw-bold {% if p.stock_quantity == 0 %}text-danger{% else %}text-warning{% endif %}">{{ p.stock_quantity }}</td>
+            <td class="text-muted">{{ p.supplier_name }}</td>
+            <td>
+              {% if p.stock_quantity == 0 %}
+                <span class="badge bg-danger">Out of Stock</span>
+              {% else %}
+                <span class="badge bg-warning text-dark">Low Stock</span>
+              {% endif %}
+            </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+    {% else %}
+    <div class="text-center py-4 text-muted"><i class="fas fa-check-circle text-success me-1"></i>All products well stocked!</div>
+    {% endif %}
   </div>
+</div>
 
-  <!-- Chart Section (Row 1) -->
-  <div class="row mb-5">
-    <div class="col-md-6">
-      <div class="card">
-        <div class="card-header">📈 Sales Revenue Over Time (₹)</div>
-        <div class="card-body"><canvas id="salesChart"></canvas></div>
-      </div>
-    </div>
-    <div class="col-md-6">
-      <div class="card">
-        <div class="card-header">🥇 Top Selling Products</div>
-        <div class="card-body"><canvas id="topProductsChart"></canvas></div>
-      </div>
+<!-- Charts Row 1 -->
+<div class="row g-4 mb-4">
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header"><i class="fas fa-chart-line text-primary me-2"></i>Sales Revenue Over Time</div>
+      <div class="card-body"><canvas id="salesChart" style="height:260px;"></canvas></div>
     </div>
   </div>
-
-  <!-- Chart Section (Row 2 - New Charts) -->
-  <div class="row mb-5">
-    <div class="col-md-6">
-      <div class="card">
-        <div class="card-header">💸 Net Sales Value Over Time</div>
-        <div class="card-body"><canvas id="netSalesChart"></canvas></div>
-      </div>
-    </div>
-    <div class="col-md-6">
-      <div class="card">
-        <div class="card-header">💰 Net Profit Over Time</div>
-        <div class="card-body"><canvas id="netProfitChart"></canvas></div>
-      </div>
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header"><i class="fas fa-trophy text-warning me-2"></i>Top Selling Products</div>
+      <div class="card-body d-flex align-items-center justify-content-center"><canvas id="topProductsChart" style="height:260px; max-width:300px;"></canvas></div>
     </div>
   </div>
+</div>
 
-  <div class="card">
-    <div class="card-header">📊 Purchase vs Sale Ratio</div>
-    <div class="card-body"><canvas id="typeChart"></canvas></div>
+<!-- Charts Row 2 -->
+<div class="row g-4 mb-4">
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header"><i class="fas fa-indian-rupee-sign text-success me-2"></i>Net Sales Value Over Time</div>
+      <div class="card-body"><canvas id="netSalesChart" style="height:260px;"></canvas></div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header"><i class="fas fa-chart-bar text-violet me-2"></i>Net Profit Over Time</div>
+      <div class="card-body"><canvas id="netProfitChart" style="height:260px;"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- Chart Row 3 -->
+<div class="row g-4">
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header"><i class="fas fa-scale-balanced text-secondary me-2"></i>Purchase vs Sale Ratio</div>
+      <div class="card-body"><canvas id="typeChart" style="height:260px;"></canvas></div>
+    </div>
   </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-  // Sales Over Time (Units Sold)
-  const salesChart = new Chart(document.getElementById('salesChart'), {
+  const chartDefaults = { responsive: true, maintainAspectRatio: false };
+
+  new Chart(document.getElementById('salesChart'), {
     type: 'line',
     data: {
       labels: {{ sales_months | safe }},
-      datasets: [{
-        label: 'Units Sold',
-        data: {{ sales_values | safe }},
-        backgroundColor: 'rgba(54, 162, 235, 0.2)',
-        borderColor: 'rgba(54, 162, 235, 1)',
-        tension: 0.3,
-        borderWidth: 2,
-        fill: true
-      }]
+      datasets: [{ label: 'Units Sold', data: {{ sales_values | safe }},
+        backgroundColor: 'rgba(79,70,229,0.1)', borderColor: '#4f46e5',
+        tension: 0.4, borderWidth: 2, fill: true, pointBackgroundColor: '#4f46e5' }]
     },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-            y: {
-                beginAtZero: true
-            }
-        }
-    }
+    options: { ...chartDefaults, scales: { y: { beginAtZero: true, grid: { color: '#f0f0f0' } } } }
   });
 
-  // Top Selling Products
-  const topProductsChart = new Chart(document.getElementById('topProductsChart'), {
-    type: 'pie',
+  new Chart(document.getElementById('topProductsChart'), {
+    type: 'doughnut',
     data: {
       labels: {{ top_products_names | safe }},
-      datasets: [{
-        data: {{ top_products_counts | safe }},
-        backgroundColor: ['#f87171', '#60a5fa', '#34d399', '#fbbf24', '#c084fc', '#ef4444', '#a78bfa', '#f97316', '#10b981', '#3b82f6'],
-        hoverOffset: 4
-      }]
+      datasets: [{ data: {{ top_products_counts | safe }},
+        backgroundColor: ['#4f46e5','#10b981','#f59e0b','#ef4444','#06b6d4','#8b5cf6','#f97316','#14b8a6','#ec4899','#84cc16'],
+        hoverOffset: 6, borderWidth: 2 }]
     },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-    }
+    options: { ...chartDefaults, plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } } }
   });
 
-  // NEW CHART: Net Sales Value Over Time
-  const netSalesChart = new Chart(document.getElementById('netSalesChart'), {
+  new Chart(document.getElementById('netSalesChart'), {
     type: 'line',
     data: {
       labels: {{ net_sales_months | safe }},
-      datasets: [{
-        label: 'Net Sales Value (₹)',
-        data: {{ net_sales_values | safe }},
-        backgroundColor: 'rgba(255, 99, 132, 0.2)',
-        borderColor: 'rgba(255, 99, 132, 1)',
-        tension: 0.3,
-        borderWidth: 2,
-        fill: true
-      }]
+      datasets: [{ label: 'Net Sales (₹)', data: {{ net_sales_values | safe }},
+        backgroundColor: 'rgba(16,185,129,0.1)', borderColor: '#10b981',
+        tension: 0.4, borderWidth: 2, fill: true, pointBackgroundColor: '#10b981' }]
     },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-            y: {
-                beginAtZero: true
-            }
-        }
-    }
+    options: { ...chartDefaults, scales: { y: { beginAtZero: true, grid: { color: '#f0f0f0' } } } }
   });
 
-  // NEW CHART: Net Profit Over Time
-  const netProfitChart = new Chart(document.getElementById('netProfitChart'), {
+  new Chart(document.getElementById('netProfitChart'), {
     type: 'bar',
     data: {
       labels: {{ net_profit_months | safe }},
-      datasets: [{
-        label: 'Net Profit (₹)',
-        data: {{ net_profit_values | safe }},
-        backgroundColor: (context) => {
-            const value = context.dataset.data[context.dataIndex];
-            return value >= 0 ? 'rgba(75, 192, 192, 0.8)' : 'rgba(255, 99, 132, 0.8)';
-        },
-        borderColor: (context) => {
-            const value = context.dataset.data[context.dataIndex];
-            return value >= 0 ? 'rgba(75, 192, 192, 1)' : 'rgba(255, 99, 132, 1)';
-        },
-        borderWidth: 1
-      }]
+      datasets: [{ label: 'Net Profit (₹)', data: {{ net_profit_values | safe }},
+        backgroundColor: (ctx) => ctx.dataset.data[ctx.dataIndex] >= 0 ? 'rgba(79,70,229,0.75)' : 'rgba(239,68,68,0.75)',
+        borderColor: (ctx) => ctx.dataset.data[ctx.dataIndex] >= 0 ? '#4f46e5' : '#ef4444',
+        borderWidth: 1, borderRadius: 4 }]
     },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-            y: {
-                beginAtZero: false
-            }
-        }
-    }
+    options: { ...chartDefaults, scales: { y: { beginAtZero: false, grid: { color: '#f0f0f0' } } } }
   });
 
-
-  // Purchase vs Sale Ratio
-  const typeChart = new Chart(document.getElementById('typeChart'), {
+  new Chart(document.getElementById('typeChart'), {
     type: 'bar',
     data: {
       labels: ['Purchase', 'Sale'],
-      datasets: [{
-        label: 'Transaction Count',
-        data: {{ type_counts | safe }},
-        backgroundColor: ['#38bdf8', '#f43f5e']
-      }]
+      datasets: [{ label: 'Transaction Count', data: {{ type_counts | safe }},
+        backgroundColor: ['rgba(6,182,212,0.75)', 'rgba(239,68,68,0.75)'],
+        borderColor: ['#06b6d4', '#ef4444'], borderWidth: 1, borderRadius: 4 }]
     },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-            y: {
-                beginAtZero: true
-            }
-        }
-    }
+    options: { ...chartDefaults, scales: { y: { beginAtZero: true, grid: { color: '#f0f0f0' } } } }
   });
 </script>
 {% endblock %}
