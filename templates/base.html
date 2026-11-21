@@ -53,6 +53,7 @@
           <li class="nav-item"><a class="nav-link {% if request.path == url_for('ledger') %}active{% endif %}" href="{{ url_for('ledger') }}">Ledger</a></li>
           <li class="nav-item"><a class="nav-link {% if '/parties' in request.path %}active{% endif %}" href="{{ url_for('parties') }}">Parties</a></li>
           <li class="nav-item"><a class="nav-link {% if request.path == url_for('settings') %}active{% endif %}" href="{{ url_for('settings') }}">⚙ Settings</a></li>
+          <li class="nav-item"><a class="nav-link {% if '/ai_service' in request.path %}active{% endif %}" href="{{ url_for('ai_service') }}">🤖 AI Assistant</a></li>
           {# Removed: <li class="nav-item"><a class="nav-link {% if request.path == url_for('edit_product') %}active{% endif %}" href="{{ url_for('edit_product') }}">Edit Products</a></li> #}
         </ul>
       </div>

@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import os
 import json
 from google import genai
+from ai_service import seed_static_knowledge, index_live_data, rag_answer
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'ERP-dev-key')
@@ -405,7 +406,7 @@ def suggest_reorder_quantity_from_ai(product_id):
     try:
         client = genai.Client(api_key=os.environ.get('GEMINI_API_KEY', ''))
         response = client.models.generate_content(
-            model='gemini-2.5-flash-lite-preview-06-17',
+            model='models/gemini-3.5-flash-lite',
             contents=prompt_text
         )
         ai_response_content = response.text.strip()
@@ -1757,8 +1758,45 @@ def delete_dm_memo(dm_id):
     return redirect(url_for('dm_memo'))
 
 
+# --- AI Service Routes ---
+
+@app.route('/ai_service', methods=['GET', 'POST'])
+def ai_service():
+    db = get_db()
+    answer = None
+    question = ''
+    error = None
+    # Re-index live data on every page load so context is fresh
+    try:
+        index_live_data(db)
+    except Exception as e:
+        error = f'Index error: {e}'
+
+    if request.method == 'POST':
+        question = request.form.get('question', '').strip()
+        if question:
+            try:
+                answer = rag_answer(question, db)
+            except Exception as e:
+                error = f'AI error: {e}'
+
+    # Chat history stored in session-like list via hidden field
+    return render_template('ai_service.html', answer=answer, question=question, error=error)
+
+
+@app.route('/ai_reindex', methods=['POST'])
+def ai_reindex():
+    try:
+        index_live_data(get_db())
+        flash('AI knowledge base re-indexed with latest data.', 'success')
+    except Exception as e:
+        flash(f'Re-index failed: {e}', 'danger')
+    return redirect(url_for('ai_service'))
+
+
 if __name__=='__main__':
     with app.app_context():
         init_db()
+        seed_static_knowledge()
     app.run(debug=os.environ.get('FLASK_DEBUG', 'false').lower() == 'true')
 
