@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+{% block title %}Add Stock{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2 class="mb-4">📦 Add Stock — Purchase Bill Entry</h2>
+
+  <div class="card">
+    <div class="card-header fw-bold">Enter Purchase Bill from Supplier</div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('add_stock') }}">
+
+        <!-- Bill header -->
+        <div class="row g-3 mb-3">
+          <div class="col-md-3">
+            <label class="form-label">Supplier Name <span class="text-danger">*</span></label>
+            <input type="text" name="supplier_name" class="form-control" list="supplierList" placeholder="Type or select supplier" required />
+            <datalist id="supplierList">
+              {% for s in suppliers %}<option value="{{ s.name }}">{% endfor %}
+            </datalist>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Bill Date <span class="text-danger">*</span></label>
+            <input type="date" name="bill_date" class="form-control" value="{{ now }}" required />
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Bill / Invoice Ref #</label>
+            <input type="text" name="bill_ref" class="form-control" placeholder="e.g. SUP-INV-001" />
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">DM Number</label>
+            <input type="text" name="dm_number" class="form-control" placeholder="e.g. DM-001" />
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Bill Type</label>
+            <div class="btn-group w-100" role="group">
+              <input type="radio" class="btn-check" name="bill_type" id="stockCash" value="cash" checked>
+              <label class="btn btn-outline-success" for="stockCash">💵 Cash</label>
+              <input type="radio" class="btn-check" name="bill_type" id="stockCredit" value="credit">
+              <label class="btn btn-outline-warning" for="stockCredit">📋 Credit</label>
+            </div>
+          </div>
+        </div>
+
+        <hr/>
+
+        <!-- Items table -->
+        <div class="table-responsive mb-2">
+          <table class="table table-bordered table-sm align-middle" id="stockTable">
+            <thead class="table-dark text-center" style="font-size:12px;">
+              <tr>
+                <th>#</th>
+                <th>Item Name</th>
+                <th>Company / Brand</th>
+                <th style="width:110px">SKU / Code</th>
+                <th style="width:70px">Qty</th>
+                <th style="width:110px">Purchase Price ₹<br/><small class="fw-normal">(GST incl, per unit)</small></th>
+                <th style="width:70px">GST %</th>
+                <th style="width:110px">Selling Price ₹<br/><small class="fw-normal">(GST incl, per unit)</small></th>
+                <th style="width:100px">Item Total ₹</th>
+                <th style="width:30px"></th>
+              </tr>
+            </thead>
+            <tbody id="stockBody">
+              <tr class="stock-row">
+                <td class="text-center sno">1</td>
+                <td><input type="text" name="item_name[]" class="form-control form-control-sm" placeholder="Item name" required /></td>
+                <td><input type="text" name="company[]" class="form-control form-control-sm" placeholder="Brand/Company" /></td>
+                <td><input type="text" name="sku[]" class="form-control form-control-sm" placeholder="Auto if blank" /></td>
+                <td><input type="number" name="quantity[]" class="form-control form-control-sm s-qty" min="1" value="1" required /></td>
+                <td><input type="number" name="purchase_price[]" class="form-control form-control-sm s-pur" step="0.01" min="0" placeholder="0.00" required /></td>
+                <td>
+                  <select name="gst_rate[]" class="form-select form-select-sm s-gst">
+                    <option value="0">0%</option>
+                    <option value="5">5%</option>
+                    <option value="12">12%</option>
+                    <option value="18" selected>18%</option>
+                    <option value="28">28%</option>
+                  </select>
+                </td>
+                <td><input type="number" name="selling_price[]" class="form-control form-control-sm s-sell" step="0.01" min="0" placeholder="0.00" /></td>
+                <td class="text-end fw-bold s-total">0.00</td>
+                <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger remove-row">✕</button></td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="10">
+                  <button type="button" class="btn btn-sm btn-outline-primary" id="addRow">+ Add Item</button>
+                </td>
+              </tr>
+              <tr class="table-warning fw-bold">
+                <td colspan="8" class="text-end">Total Bill Amount</td>
+                <td class="text-end" id="billTotal">₹ 0.00</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <button type="submit" class="btn btn-success btn-lg">📥 Save Stock & Post to Ledger</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+  function calcRow(row) {
+    const qty = parseInt(row.querySelector('.s-qty').value) || 1;
+    const pur = parseFloat(row.querySelector('.s-pur').value) || 0;
+    const total = qty * pur;
+    row.querySelector('.s-total').textContent = total.toFixed(2);
+    return total;
+  }
+
+  function recalc() {
+    let grand = 0;
+    document.querySelectorAll('.stock-row').forEach(r => grand += calcRow(r));
+    document.getElementById('billTotal').textContent = '₹ ' + grand.toFixed(2);
+  }
+
+  document.getElementById('stockBody').addEventListener('input', function(e) {
+    if (e.target.classList.contains('s-qty') || e.target.classList.contains('s-pur')) {
+      calcRow(e.target.closest('.stock-row')); recalc();
+    }
+  });
+
+  document.getElementById('addRow').addEventListener('click', function() {
+    const tbody = document.getElementById('stockBody');
+    const clone = tbody.querySelector('.stock-row').cloneNode(true);
+    clone.querySelectorAll('input').forEach(el => {
+      el.value = el.classList.contains('s-qty') ? 1 : '';
+    });
+    clone.querySelectorAll('select').forEach(el => el.selectedIndex = 3); // default 18%
+    clone.querySelector('.s-total').textContent = '0.00';
+    clone.querySelector('.sno').textContent = tbody.querySelectorAll('.stock-row').length + 1;
+    tbody.appendChild(clone);
+  });
+
+  document.getElementById('stockBody').addEventListener('click', function(e) {
+    if (e.target.classList.contains('remove-row')) {
+      if (document.querySelectorAll('.stock-row').length > 1) {
+        e.target.closest('.stock-row').remove();
+        document.querySelectorAll('.stock-row .sno').forEach((s,i) => s.textContent = i+1);
+        recalc();
+      }
+    }
+  });
+</script>
+{% endblock %}

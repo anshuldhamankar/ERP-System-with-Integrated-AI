@@ -1,0 +1,339 @@
+{% extends 'base.html' %}
+{% block title %}Billing - ERP Lite{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2 class="mb-4">🧾 Billing — Tax Invoices</h2>
+
+  <div class="card mb-5">
+    <div class="card-header fw-bold d-flex justify-content-between align-items-center">
+      <span>Create New Invoice</span>
+      <div class="btn-group" role="group">
+        <input type="radio" class="btn-check" name="billTypeToggle" id="cashBill" value="cash" checked>
+        <label class="btn btn-outline-success btn-sm" for="cashBill">💵 Cash Bill</label>
+        <input type="radio" class="btn-check" name="billTypeToggle" id="creditBill" value="credit">
+        <label class="btn btn-outline-warning btn-sm" for="creditBill">📋 Credit Bill</label>
+      </div>
+    </div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('create_invoice') }}" id="invoiceForm">
+        <input type="hidden" name="bill_type" id="bill_type" value="cash">
+
+        <!-- Row 1: Invoice meta -->
+        <div class="row g-3 mb-3">
+          <div class="col-md-3">
+            <label class="form-label">Invoice Number</label>
+            <input type="text" name="invoice_number" class="form-control" placeholder="Auto-generated" />
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Invoice Date <span class="text-danger">*</span></label>
+            <input type="date" name="invoice_date" class="form-control" value="{{ now }}" required />
+          </div>
+        </div>
+
+        <!-- Row 2: Customer details -->
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <label class="form-label">Customer Name <span class="text-danger">*</span></label>
+            <input type="text" name="bill_to_name" class="form-control" placeholder="Customer name" required />
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Customer GSTIN</label>
+            <input type="text" name="bill_to_gstin" class="form-control" placeholder="Optional" />
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Mobile</label>
+            <input type="text" name="ship_to_mobile" class="form-control" />
+          </div>
+        </div>
+
+        <!-- Credit bill: due date (hidden for cash) -->
+        <div class="row g-3 mb-3" id="creditFields" style="display:none!important;">
+          <div class="col-md-3">
+            <label class="form-label">Due Date</label>
+            <input type="date" name="due_date" class="form-control" />
+          </div>
+          <div class="col-md-9">
+            <label class="form-label">Shipping Address</label>
+            <input type="text" name="ship_to_address" class="form-control" placeholder="Address" />
+          </div>
+        </div>
+
+        <hr/>
+
+        <!-- GST rate selector (global default, overridable per item) -->
+        <div class="row g-3 mb-2 align-items-end">
+          <div class="col-auto">
+            <label class="form-label fw-bold">Default GST % (per item)</label>
+            <select id="defaultGstRate" class="form-select form-select-sm" style="width:140px;">
+              <option value="0">0% (Exempt)</option>
+              <option value="5">5% GST</option>
+              <option value="12">12% GST</option>
+              <option value="18" selected>18% GST</option>
+              <option value="28">28% GST</option>
+            </select>
+          </div>
+          <div class="col-auto">
+            <small class="text-muted">You enter the <strong>GST-inclusive amount</strong>. CGST &amp; SGST are auto-calculated.</small>
+          </div>
+        </div>
+
+        <!-- Line Items -->
+        <div class="table-responsive mb-2">
+          <table class="table table-bordered align-middle table-sm" id="itemsTable">
+            <thead class="table-primary text-center" style="font-size:12px;">
+              <tr>
+                <th style="width:30px">#</th>
+                <th>Item Name</th>
+                <th style="width:80px">Qty</th>
+                <th style="width:120px">Unit Price ₹<br/><small class="fw-normal">(GST incl.)</small></th>
+                <th style="width:70px">GST %</th>
+                <th style="width:90px">Taxable (₹)</th>
+                <th style="width:80px">CGST (₹)</th>
+                <th style="width:80px">SGST (₹)</th>
+                <th style="width:100px">Total (₹)</th>
+                <th style="width:30px"></th>
+              </tr>
+            </thead>
+            <tbody id="itemsBody">
+              <tr class="item-row">
+                <td class="text-center sno">1</td>
+                <td>
+                  <select name="item_description[]" class="form-select form-select-sm mb-1 item-select" required>
+                    <option value="">-- Select Item --</option>
+                    {% for p in products %}
+                    <option value="{{ p.name }}"
+                      data-manufacturer="{{ p.company or p.supplier_name or '' }}"
+                      data-price="{{ p.unit_price }}"
+                      data-id="{{ p.id }}">
+                      {{ p.name }}{% if p.company %} — {{ p.company }}{% endif %}
+                    </option>
+                    {% endfor %}
+                  </select>
+                  <input type="hidden" name="item_product_id[]" class="item-product-id" value="" />
+                  <div class="row g-1">
+                    <div class="col"><input type="text" name="batch[]" class="form-control form-control-sm" placeholder="Batch" /></div>
+                    <div class="col"><input type="date" name="mfg_date[]" class="form-control form-control-sm" /></div>
+                    <div class="col"><input type="date" name="exp_date[]" class="form-control form-control-sm" /></div>
+                  </div>
+                  <input type="text" name="manufacturer[]" class="form-control form-control-sm mt-1 manufacturer-field" placeholder="Manufacturer" />
+                </td>
+                <td><input type="number" name="quantity[]" class="form-control form-control-sm qty" min="1" value="1" required /></td>
+                <td><input type="number" name="unit_price[]" class="form-control form-control-sm unit-price" step="0.01" min="0" placeholder="0.00" required /></td>
+                <td>
+                  <select name="item_gst_rate[]" class="form-select form-select-sm item-gst-rate">
+                    <option value="0">0%</option>
+                    <option value="5">5%</option>
+                    <option value="12">12%</option>
+                    <option value="18" selected>18%</option>
+                    <option value="28">28%</option>
+                  </select>
+                </td>
+                <td class="text-end taxable-cell">0.00</td>
+                <td class="text-end cgst-cell">0.00</td>
+                <td class="text-end sgst-cell">0.00</td>
+                <td class="text-end fw-bold total-cell">0.00</td>
+                <td class="text-center">
+                  <button type="button" class="btn btn-sm btn-outline-danger remove-row">✕</button>
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="10">
+                  <button type="button" class="btn btn-sm btn-outline-primary" id="addRow">+ Add Item</button>
+                </td>
+              </tr>
+              <tr class="table-light fw-bold">
+                <td colspan="5" class="text-end">Sub Total (Taxable)</td>
+                <td class="text-end" id="sumTaxable">0.00</td>
+                <td class="text-end" id="sumCgst">0.00</td>
+                <td class="text-end" id="sumSgst">0.00</td>
+                <td class="text-end" id="sumTotal">0.00</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <!-- Summary panel -->
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <label class="form-label">Terms &amp; Conditions</label>
+            <textarea name="terms" class="form-control" rows="3">{{ shop.terms or '' }}</textarea>
+          </div>
+          <div class="col-md-6">
+            <table class="table table-sm table-borderless mb-0">
+              <tr><td class="text-muted">Taxable Amount</td><td class="text-end fw-bold" id="dispTaxable">₹ 0.00</td></tr>
+              <tr><td class="text-muted">CGST ({{ shop.default_cgst }}%)</td><td class="text-end" id="dispCgst">₹ 0.00</td></tr>
+              <tr><td class="text-muted">SGST ({{ shop.default_sgst }}%)</td><td class="text-end" id="dispSgst">₹ 0.00</td></tr>
+              <tr>
+                <td class="text-muted">Round Off</td>
+                <td><input type="number" name="round_off" id="roundOff" class="form-control form-control-sm text-end" step="0.01" value="0" style="width:100px;float:right;" /></td>
+              </tr>
+              <tr class="table-primary fw-bold fs-5">
+                <td>Grand Total</td>
+                <td class="text-end" id="grandTotal">₹ 0.00</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg">🧾 Create Invoice</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Invoice List -->
+  <div class="card">
+    <div class="card-header fw-bold">All Invoices</div>
+    <div class="card-body table-responsive p-0">
+      <table class="table table-bordered table-hover mb-0">
+        <thead class="table-dark">
+          <tr>
+            <th>Invoice #</th><th>Date</th><th>Type</th><th>Customer</th>
+            <th>Taxable</th><th>CGST</th><th>SGST</th><th>Total</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for inv in invoices %}
+          <tr>
+            <td>{{ inv.invoice_number }}</td>
+            <td>{{ inv.invoice_date }}</td>
+            <td>
+              <span class="badge {% if inv.bill_type == 'cash' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                {{ (inv.bill_type or 'cash') | upper }}
+              </span>
+            </td>
+            <td>{{ inv.bill_to_name }}</td>
+            <td class="text-end">₹{{ "%.2f"|format(inv.total_taxable or 0) }}</td>
+            <td class="text-end">₹{{ "%.2f"|format(inv.total_cgst or 0) }}</td>
+            <td class="text-end">₹{{ "%.2f"|format(inv.total_sgst or 0) }}</td>
+            <td class="text-end fw-bold">₹{{ "%.2f"|format(inv.grand_total or 0) }}</td>
+            <td>
+              <a href="{{ url_for('invoice_detail', invoice_id=inv.id) }}" class="btn btn-sm btn-info">View</a>
+              <a href="{{ url_for('invoice_print', invoice_id=inv.id) }}" class="btn btn-sm btn-secondary" target="_blank">Print</a>
+              <form method="POST" action="{{ url_for('delete_invoice', invoice_id=inv.id) }}" style="display:inline;">
+                <button class="btn btn-sm btn-danger" onclick="return confirm('Delete invoice?')">Del</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="9" class="text-center text-muted py-3">No invoices yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+  // ---- Bill type toggle ----
+  document.querySelectorAll('input[name="billTypeToggle"]').forEach(r => {
+    r.addEventListener('change', function() {
+      document.getElementById('bill_type').value = this.value;
+      const cf = document.getElementById('creditFields');
+      cf.style.setProperty('display', this.value === 'credit' ? 'flex' : 'none', 'important');
+    });
+  });
+
+  // ---- Auto-fill manufacturer + price from product select ----
+  document.getElementById('itemsBody').addEventListener('change', function(e) {
+    if (e.target.classList.contains('item-select')) {
+      const opt = e.target.selectedOptions[0];
+      const row = e.target.closest('.item-row');
+      if (opt.value) {
+        row.querySelector('.manufacturer-field').value = opt.dataset.manufacturer || '';
+        row.querySelector('.item-product-id').value    = opt.dataset.id || '';
+        if (opt.dataset.price) {
+          row.querySelector('.unit-price').value = parseFloat(opt.dataset.price).toFixed(2);
+          calcRow(row); recalcSummary();
+        }
+      } else {
+        row.querySelector('.manufacturer-field').value = '';
+        row.querySelector('.item-product-id').value    = '';
+      }
+    }
+    if (e.target.classList.contains('item-gst-rate')) {
+      calcRow(e.target.closest('.item-row')); recalcSummary();
+    }
+  });
+
+  // ---- Apply default GST to all rows ----
+  document.getElementById('defaultGstRate').addEventListener('change', function() {
+    document.querySelectorAll('.item-gst-rate').forEach(s => s.value = this.value);
+    document.querySelectorAll('.item-row').forEach(r => calcRow(r));
+    recalcSummary();
+  });
+
+  function calcRow(row) {
+    const unitPrice = parseFloat(row.querySelector('.unit-price').value) || 0;
+    const qty       = parseInt(row.querySelector('.qty').value) || 1;
+    const incl      = unitPrice * qty;
+    const gstPct    = parseFloat(row.querySelector('.item-gst-rate').value) || 0;
+    const taxable   = gstPct ? incl / (1 + gstPct / 100) : incl;
+    const tax       = incl - taxable;
+    const cgst      = tax / 2;
+    const sgst      = tax - cgst;
+    row.querySelector('.taxable-cell').textContent = taxable.toFixed(2);
+    row.querySelector('.cgst-cell').textContent    = cgst.toFixed(2);
+    row.querySelector('.sgst-cell').textContent    = sgst.toFixed(2);
+    row.querySelector('.total-cell').textContent   = incl.toFixed(2);
+    return { taxable, cgst, sgst, incl };
+  }
+
+  function recalcSummary() {
+    let sTaxable=0, sCgst=0, sSgst=0, sTotal=0;
+    document.querySelectorAll('.item-row').forEach(r => {
+      const v = calcRow(r);
+      sTaxable += v.taxable; sCgst += v.cgst; sSgst += v.sgst; sTotal += v.incl;
+    });
+    document.getElementById('sumTaxable').textContent = sTaxable.toFixed(2);
+    document.getElementById('sumCgst').textContent    = sCgst.toFixed(2);
+    document.getElementById('sumSgst').textContent    = sSgst.toFixed(2);
+    document.getElementById('sumTotal').textContent   = sTotal.toFixed(2);
+    document.getElementById('dispTaxable').textContent = '₹ ' + sTaxable.toFixed(2);
+    document.getElementById('dispCgst').textContent    = '₹ ' + sCgst.toFixed(2);
+    document.getElementById('dispSgst').textContent    = '₹ ' + sSgst.toFixed(2);
+    const ro = parseFloat(document.getElementById('roundOff').value) || 0;
+    document.getElementById('grandTotal').textContent = '₹ ' + (sTotal + ro).toFixed(2);
+  }
+
+  document.getElementById('itemsBody').addEventListener('input', function(e) {
+    if (e.target.classList.contains('unit-price') || e.target.classList.contains('qty')) {
+      calcRow(e.target.closest('.item-row')); recalcSummary();
+    }
+  });
+  document.getElementById('roundOff').addEventListener('input', recalcSummary);
+
+  // ---- Add / Remove rows ----
+  document.getElementById('addRow').addEventListener('click', function() {
+    const tbody = document.getElementById('itemsBody');
+    const clone = tbody.querySelector('.item-row').cloneNode(true);
+    clone.querySelectorAll('input').forEach(el => {
+      el.value = el.classList.contains('qty') ? 1 : '';
+    });
+    clone.querySelectorAll('select').forEach(el => el.selectedIndex = 0);
+    clone.querySelectorAll('.taxable-cell,.cgst-cell,.sgst-cell,.total-cell').forEach(c => c.textContent = '0.00');
+    clone.querySelector('.sno').textContent = tbody.querySelectorAll('.item-row').length + 1;
+    clone.querySelector('.item-gst-rate').value = document.getElementById('defaultGstRate').value;
+    clone.querySelector('.manufacturer-field').value = '';
+    clone.querySelector('.item-product-id').value = '';
+    tbody.appendChild(clone);
+  });
+
+  document.getElementById('itemsBody').addEventListener('click', function(e) {
+    if (e.target.classList.contains('remove-row')) {
+      if (document.querySelectorAll('.item-row').length > 1) {
+        e.target.closest('.item-row').remove();
+        document.querySelectorAll('.item-row .sno').forEach((s,i) => s.textContent = i+1);
+        recalcSummary();
+      }
+    }
+  });
+</script>
+{% endblock %}

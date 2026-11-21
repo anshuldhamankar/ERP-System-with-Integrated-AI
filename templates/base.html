@@ -42,10 +42,15 @@
       <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav ms-auto">
           <li class="nav-item"><a class="nav-link {% if request.path == url_for('dashboard') %}active{% endif %}" href="{{ url_for('dashboard') }}">Dashboard</a></li>
-          <li class="nav-item"><a class="nav-link {% if request.path == url_for('products') %}active{% endif %}" href="{{ url_for('products') }}">Products</a></li>
-          <li class="nav-item"><a class="nav-link {% if request.path == url_for('suppliers') %}active{% endif %}" href="{{ url_for('suppliers') }}">Suppliers</a></li>
-          <li class="nav-item"><a class="nav-link {% if request.path == url_for('transactions') %}active{% endif %}" href="{{ url_for('transactions') }}">Transactions</a></li>
+          <li class="nav-item"><a class="nav-link {% if request.path == url_for('add_stock') %}active{% endif %}" href="{{ url_for('add_stock') }}">Add Stock</a></li>
+          <li class="nav-item"><a class="nav-link {% if request.path == url_for('stock') %}active{% endif %}" href="{{ url_for('stock') }}">Stock</a></li>
           <li class="nav-item"><a class="nav-link {% if request.path == url_for('reports') %}active{% endif %}" href="{{ url_for('reports') }}">Reports</a></li>
+          <li class="nav-item"><a class="nav-link {% if '/billing' in request.path %}active{% endif %}" href="{{ url_for('billing') }}">Billing</a></li>
+          <li class="nav-item"><a class="nav-link {% if '/cash_receipt' in request.path %}active{% endif %}" href="{{ url_for('cash_receipt') }}">Cash Receipt</a></li>
+          <li class="nav-item"><a class="nav-link {% if '/supplier_payment' in request.path %}active{% endif %}" href="{{ url_for('supplier_payment') }}">Supplier Payment</a></li>
+          <li class="nav-item"><a class="nav-link {% if request.path == url_for('ledger') %}active{% endif %}" href="{{ url_for('ledger') }}">Ledger</a></li>
+          <li class="nav-item"><a class="nav-link {% if '/parties' in request.path %}active{% endif %}" href="{{ url_for('parties') }}">Parties</a></li>
+          <li class="nav-item"><a class="nav-link {% if request.path == url_for('settings') %}active{% endif %}" href="{{ url_for('settings') }}">⚙ Settings</a></li>
           {# Removed: <li class="nav-item"><a class="nav-link {% if request.path == url_for('edit_product') %}active{% endif %}" href="{{ url_for('edit_product') }}">Edit Products</a></li> #}
         </ul>
       </div>
@@ -54,10 +59,13 @@
 
   <!-- Flash messages -->
   <div class="container">
-    {% with messages = get_flashed_messages() %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
-        {% for message in messages %}
-          <div class="alert alert-info mt-2">{{ message }}</div>
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category if category in ['success','danger','warning','info'] else 'info' }} alert-dismissible fade show mt-2" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
         {% endfor %}
       {% endif %}
     {% endwith %}

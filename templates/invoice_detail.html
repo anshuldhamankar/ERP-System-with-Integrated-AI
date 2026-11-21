@@ -1,0 +1,154 @@
+{% extends 'base.html' %}
+{% block title %}Invoice {{ invoice.invoice_number }} - ERP Lite{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Invoice {{ invoice.invoice_number }}</h2>
+    <div>
+      <a href="{{ url_for('invoice_print', invoice_id=invoice.id) }}" class="btn btn-secondary" target="_blank">🖨 Print</a>
+      <a href="{{ url_for('billing') }}" class="btn btn-outline-secondary">← Back</a>
+    </div>
+  </div>
+
+  {% set sub_total = namespace(val=0) %}
+  {% for item in items %}
+    {% set base = item.quantity * item.rate %}
+    {% set amt  = base + (base * item.tax_rate / 100) %}
+    {% set sub_total.val = sub_total.val + amt %}
+  {% endfor %}
+  {% set cgst_amt  = sub_total.val * invoice.cgst_rate  / 100 %}
+  {% set sgst_amt  = sub_total.val * invoice.sgst_rate  / 100 %}
+  {% set cgst2_amt = sub_total.val * invoice.cgst2_rate / 100 %}
+  {% set sgst2_amt = sub_total.val * invoice.sgst2_rate / 100 %}
+  {% set grand_total = sub_total.val + cgst_amt + sgst_amt + cgst2_amt + sgst2_amt + invoice.round_off %}
+
+  <div class="card shadow-sm">
+    <div class="card-body p-4">
+
+      <!-- Header -->
+      <div class="row mb-3">
+        <div class="col-md-6">
+          <h4 class="fw-bold">{{ invoice.supplier_name or 'Your Company' }}</h4>
+        </div>
+        <div class="col-md-6 text-end">
+          <div class="bg-primary text-white px-3 py-2 d-inline-block rounded">
+            <h5 class="mb-0">Tax Invoice</h5>
+          </div>
+          <table class="table table-sm table-borderless mt-2 mb-0 ms-auto" style="width:auto;">
+            <tr><td class="text-muted">Invoice Number</td><td>: <strong>{{ invoice.invoice_number }}</strong></td></tr>
+            <tr><td class="text-muted">Invoice Date</td><td>: {{ invoice.invoice_date }}</td></tr>
+            <tr><td class="text-muted">Due Date</td><td>: {{ invoice.due_date }}</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <hr/>
+
+      <!-- Issued To + Shipping -->
+      <div class="row mb-3">
+        <div class="col-md-6 border-end">
+          <p class="mb-1 text-muted small fw-bold">Issued To</p>
+          <p class="mb-0 fw-bold">{{ invoice.bill_to_name }}</p>
+          {% if invoice.bill_to_gstin %}<p class="mb-0 small">GSTIN : {{ invoice.bill_to_gstin }}</p>{% endif %}
+          {% if invoice.bill_to_pos %}<p class="mb-0 small">POS : {{ invoice.bill_to_pos }}</p>{% endif %}
+        </div>
+        <div class="col-md-6 ps-4">
+          <p class="mb-1 text-muted small fw-bold">Billing & Shipping Address</p>
+          {% if invoice.ship_to_name %}<p class="mb-0 fw-bold">{{ invoice.ship_to_name }}</p>{% endif %}
+          {% if invoice.ship_to_address %}<p class="mb-0 small">{{ invoice.ship_to_address }}</p>{% endif %}
+          {% if invoice.ship_to_mobile %}<p class="mb-0 small">Mobile : {{ invoice.ship_to_mobile }}</p>{% endif %}
+          {% if invoice.ship_to_email %}<p class="mb-0 small">Email : {{ invoice.ship_to_email }}</p>{% endif %}
+        </div>
+      </div>
+
+      <!-- Items Table -->
+      <table class="table table-bordered table-sm">
+        <thead class="table-primary text-center">
+          <tr>
+            <th>S.No</th>
+            <th>Item Description<br/><small class="fw-normal">Batch / Mfg.Date / Exp.Date</small></th>
+            <th>Qty</th>
+            <th>Rate (₹)</th>
+            <th>Tax</th>
+            <th>Amount (₹)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in items %}
+          {% set base = item.quantity * item.rate %}
+          {% set amt  = base + (base * item.tax_rate / 100) %}
+          <tr>
+            <td class="text-center">{{ loop.index }}</td>
+            <td>
+              <strong>{{ item.item_description }}</strong><br/>
+              {% if item.batch or item.mfg_date or item.exp_date %}
+              <small class="text-muted">
+                {{ item.batch or '' }}
+                {% if item.mfg_date %} &nbsp; {{ item.mfg_date }}{% endif %}
+                {% if item.exp_date %} &nbsp; {{ item.exp_date }}{% endif %}
+              </small><br/>
+              {% endif %}
+              {% if item.manufacturer %}<small class="text-muted">Manufacturer : {{ item.manufacturer }}</small>{% endif %}
+            </td>
+            <td class="text-center">{{ item.quantity }}</td>
+            <td class="text-end">{{ "%.2f"|format(item.rate) }}</td>
+            <td class="text-center">{{ item.tax_label or '' }}{% if item.tax_rate %} ({{ item.tax_rate }}%){% endif %}</td>
+            <td class="text-end fw-bold">{{ "%.2f"|format(amt) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="5" class="text-end fw-bold">Sub Total</td>
+            <td class="text-end fw-bold">{{ "%.2f"|format(sub_total.val) }}</td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <!-- Tax Summary + Total -->
+      <div class="row">
+        <div class="col-md-6">
+          {% if invoice.terms %}
+          <p class="small text-muted mb-1 fw-bold">Terms & Conditions :</p>
+          <p class="small" style="white-space:pre-line;">{{ invoice.terms }}</p>
+          {% endif %}
+          <p class="small text-muted mt-2">Thanks for your Business</p>
+        </div>
+        <div class="col-md-6">
+          <table class="table table-sm table-borderless ms-auto" style="width:auto; min-width:280px;">
+            {% if invoice.cgst_rate %}
+            <tr><td>CGST {{ invoice.cgst_rate }}% on {{ "%.2f"|format(sub_total.val) }}</td><td class="text-end">{{ "%.2f"|format(cgst_amt) }}</td></tr>
+            {% endif %}
+            {% if invoice.sgst_rate %}
+            <tr><td>SGST {{ invoice.sgst_rate }}% on {{ "%.2f"|format(sub_total.val) }}</td><td class="text-end">{{ "%.2f"|format(sgst_amt) }}</td></tr>
+            {% endif %}
+            {% if invoice.cgst2_rate %}
+            <tr><td>CGST {{ invoice.cgst2_rate }}% on {{ "%.2f"|format(sub_total.val) }}</td><td class="text-end">{{ "%.2f"|format(cgst2_amt) }}</td></tr>
+            {% endif %}
+            {% if invoice.sgst2_rate %}
+            <tr><td>SGST {{ invoice.sgst2_rate }}% on {{ "%.2f"|format(sub_total.val) }}</td><td class="text-end">{{ "%.2f"|format(sgst2_amt) }}</td></tr>
+            {% endif %}
+            {% if invoice.round_off %}
+            <tr><td>Round Off</td><td class="text-end">{{ "%.2f"|format(invoice.round_off) }}</td></tr>
+            {% endif %}
+            <tr class="table-primary fw-bold fs-5">
+              <td>Total</td>
+              <td class="text-end">Rs {{ "%.2f"|format(grand_total) }}</td>
+            </tr>
+          </table>
+          <p class="text-end small text-muted">E & O.E</p>
+        </div>
+      </div>
+
+      <hr/>
+      <div class="text-end">
+        <p class="small fw-bold">For {{ invoice.supplier_name or 'Your Company' }}</p>
+        <p class="small text-muted mt-4">Authorized Signature</p>
+      </div>
+      <p class="text-center text-muted small mt-3">This is a computer generated document</p>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

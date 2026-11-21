@@ -36,10 +36,7 @@
       <div class="card text-bg-info">
         <div class="card-body">
           <h5>Total Net Profit</h5>
-          {# Calculate total net profit on the fly from previous chart data or add to backend #}
-          {# For simplicity here, assuming it's not a direct summary card as it's complex for a single number #}
-          {# If a single total net profit number is desired, it needs to be added to app.py #}
-          <p class="display-6">See graph below</p>
+          <p class="display-6">₹ {{ net_profit_values | sum | round(2) }}</p>
         </div>
       </div>
     </div>
@@ -203,7 +200,7 @@
         maintainAspectRatio: false,
         scales: {
             y: {
-                beginAtZero: true // This might need adjustment if negative profits are common
+                beginAtZero: false
             }
         }
     }
